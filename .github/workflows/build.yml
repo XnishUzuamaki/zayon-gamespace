@@ -1,5 +1,4 @@
-
-name: Build Zayon APK Stable
+name: Build APK Direct
 
 on:
   push:
@@ -20,12 +19,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.5'
-
-      - name: Create Project Files
+      - name: Buat Projek Tanpa Cache
         run: |
           mkdir -p app/src/main/java/com/xnish/gamespace
 
@@ -46,6 +40,7 @@ jobs:
           cat << 'EOF' > gradle.properties
           android.useAndroidX=true
           org.gradle.jvmargs=-Xmx2048m
+          org.gradle.caching=false
           EOF
 
           cat << 'EOF' > app/build.gradle.kts
@@ -60,8 +55,8 @@ jobs:
                   applicationId = "com.xnish.gamespace"
                   minSdk = 26
                   targetSdk = 34
-                  versionCode = 11
-                  versionName = "1.1.1"
+                  versionCode = 12
+                  versionName = "1.1.2"
               }
               buildFeatures { compose = true }
               composeOptions { kotlinCompilerExtensionVersion = "1.5.3" }
@@ -620,11 +615,11 @@ jobs:
           }
           EOF
 
-      - name: Build APK with Gradle
-        run: gradle assembleDebug
+      - name: Build APK Direct
+        run: ./gradlew assembleDebug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Zayon-GameSpace-APK-v111
+          name: Zayon-GameSpace-APK-v112
           path: app/build/outputs/apk/debug/app-debug.apk
