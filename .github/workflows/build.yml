@@ -1,0 +1,509 @@
+name: Auto Build Zayon APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
+
+      - name: Jana Semua Fail Projek Secara Automatik
+        run: |
+          mkdir -p app/src/main/java/com/xnish/gamespace
+
+          cat << 'EOF' > settings.gradle.kts
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "XnishGameSpace"
+          include(":app")
+          EOF
+
+          cat << 'EOF' > build.gradle.kts
+          plugins {
+              id("com.android.application") version "8.2.2" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.22" apply false
+          }
+          EOF
+
+          cat << 'EOF' > gradle.properties
+          android.useAndroidX=true
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          EOF
+
+          cat << 'EOF' > app/build.gradle.kts
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+
+          android {
+              namespace = "com.xnish.gamespace"
+              compileSdk = 34
+
+              defaultConfig {
+                  applicationId = "com.xnish.gamespace"
+                  minSdk = 26
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0.5"
+              }
+
+              buildFeatures { compose = true }
+              composeOptions { kotlinCompilerExtensionVersion = "1.5.10" }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+
+          dependencies {
+              implementation("androidx.core:core-ktx:1.12.0")
+              implementation("androidx.activity:activity-compose:1.8.2")
+              implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+              implementation("androidx.compose.ui:ui")
+              implementation("androidx.compose.material3:material3")
+              implementation("androidx.compose.material:material-icons-extended")
+              implementation("dev.rikka.shizuku:api:13.1.5")
+              implementation("dev.rikka.shizuku:provider:13.1.5")
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+              <application
+                  android:allowBackup="true"
+                  android:label="Zayon Liquid Glass"
+                  android:supportsRtl="true"
+                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:configChanges="orientation|screenSize">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <provider
+                      android:name="rikka.shizuku.ShizukuProvider"
+                      android:authorities="${applicationId}.shizuku"
+                      android:enabled="true"
+                      android:exported="true"
+                      android:multiprocess="false"
+                      android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+              </application>
+          </manifest>
+          EOF
+
+      - name: Masukkan Kod MainActivity.kt
+        run: |
+          cat << 'EOF' > app/src/main/java/com/xnish/gamespace/MainActivity.kt
+          package com.xnish.gamespace
+
+          import android.content.pm.ActivityInfo
+          import android.content.pm.PackageManager
+          import android.os.Bundle
+          import android.widget.Toast
+          import androidx.activity.ComponentActivity
+          import androidx.activity.compose.setContent
+          import androidx.compose.foundation.Canvas
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.border
+          import androidx.compose.foundation.clickable
+          import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+          import androidx.compose.foundation.layout.*
+          import androidx.compose.foundation.rememberScrollState
+          import androidx.compose.foundation.shape.CircleShape
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.foundation.verticalScroll
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.filled.*
+          import androidx.compose.material3.*
+          import androidx.compose.runtime.*
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.geometry.Offset
+          import androidx.compose.ui.graphics.Brush
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.graphics.Shape
+          import androidx.compose.ui.input.pointer.pointerInput
+          import androidx.compose.ui.platform.LocalContext
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import rikka.shizuku.Shizuku
+          import java.io.BufferedReader
+          import java.io.InputStreamReader
+
+          val DeepSpaceBlack = Color(0xFF07030F)
+          val NeonPurple = Color(0xFFB845FF)
+          val ElectricViolet = Color(0xFF7B2CBF)
+          val LiquidLavender = Color(0xFFE0AAFF)
+          val GlassWhite = Color(0xFFFFFFFF)
+
+          class MainActivity : ComponentActivity(), Shizuku.OnRequestPermissionResultListener {
+              private var shizukuGranted by mutableStateOf(false)
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  Shizuku.addRequestPermissionResultListener(this)
+                  checkShizukuPermission()
+
+                  setContent {
+                      var currentScreen by remember { mutableStateOf("HOME") }
+                      LaunchedEffect(currentScreen) {
+                          requestedOrientation = if (currentScreen == "HOME") {
+                              ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                          } else {
+                              ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                          }
+                      }
+                      LiquidGlassBackground {
+                          if (currentScreen == "HOME") {
+                              HomeScreen(
+                                  shizukuReady = shizukuGranted,
+                                  onRequestShizuku = { requestShizuku() },
+                                  onEnterGameSpace = { currentScreen = "GRAPHICS" }
+                              )
+                          } else {
+                              GraphicsConfigScreen(
+                                  shizukuReady = shizukuGranted,
+                                  onBack = { currentScreen = "HOME" },
+                                  onApplyGraphics = { detailLevel, sharpPixels, hardSteps, enabled ->
+                                      applyShizukuGraphics(detailLevel, sharpPixels, hardSteps, enabled)
+                                  }
+                              )
+                          }
+                      }
+                  }
+              }
+
+              private fun checkShizukuPermission() {
+                  try {
+                      if (Shizuku.pingBinder()) {
+                          shizukuGranted = Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+                      }
+                  } catch (_: Exception) { shizukuGranted = false }
+              }
+
+              private fun requestShizuku() {
+                  try {
+                      if (!Shizuku.pingBinder()) {
+                          Toast.makeText(this, "Sila hidupkan servis Shizuku dahulu!", Toast.LENGTH_SHORT).show()
+                          return
+                      }
+                      if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+                          Shizuku.requestPermission(1001)
+                      } else {
+                          shizukuGranted = true
+                          Toast.makeText(this, "Akses Shizuku Aktif!", Toast.LENGTH_SHORT).show()
+                      }
+                  } catch (e: Exception) {
+                      Toast.makeText(this, "Ralat Shizuku: ${e.message}", Toast.LENGTH_SHORT).show()
+                  }
+              }
+
+              override fun onRequestPermissionResult(requestCode: Int, grantResult: Int) {
+                  shizukuGranted = grantResult == PackageManager.PERMISSION_GRANTED
+              }
+
+              private fun applyShizukuGraphics(detailIndex: Int, sharpPixels: Boolean, hardSteps: Boolean, ffMaxEnabled: Boolean) {
+                  if (!shizukuGranted) {
+                      requestShizuku()
+                      return
+                  }
+                  val pkg = "com.dts.freefiremax"
+                  if (!ffMaxEnabled) {
+                      runShizukuShell("cmd game mode standard $pkg")
+                      Toast.makeText(this, "Reset ke grafik asal berjaya.", Toast.LENGTH_SHORT).show()
+                      return
+                  }
+                  val downscaleRatio = when (detailIndex) {
+                      0 -> "1.0"
+                      1 -> "0.85"
+                      2 -> "0.70"
+                      3 -> "0.55"
+                      else -> "0.40"
+                  }
+                  val commands = mutableListOf(
+                      "cmd game mode custom $pkg",
+                      "device_config put game_overlay $pkg mode=2,downscaleFactor=$downscaleRatio:mode=3,downscaleFactor=$downscaleRatio",
+                      "setprop debug.hwui.renderer skiagl",
+                      if (sharpPixels) "setprop debug.hwui.filter_quality nearest" else "setprop debug.hwui.filter_quality linear"
+                  )
+                  if (hardSteps) commands.add("setprop debug.egl.force_msaa false")
+                  val success = commands.all { runShizukuShell(it) }
+                  Toast.makeText(this, if (success) "Grafik Light Texture ($downscaleRatio) diaktifkan!" else "Gagal jalankan Shizuku.", Toast.LENGTH_LONG).show()
+              }
+
+              private fun runShizukuShell(cmd: String): Boolean {
+                  return try {
+                      val method = Shizuku::class.java.getDeclaredMethod("newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java)
+                      method.isAccessible = true
+                      val process = method.invoke(null, arrayOf("sh", "-c", cmd), null, null) as Process
+                      BufferedReader(InputStreamReader(process.inputStream)).readText()
+                      process.waitFor() == 0
+                  } catch (e: Exception) { false }
+              }
+
+              override fun onDestroy() {
+                  super.onDestroy()
+                  Shizuku.removeRequestPermissionResultListener(this)
+              }
+          }
+
+          @Composable
+          fun LiquidGlassBackground(content: @Composable BoxScope.() -> Unit) {
+              Box(modifier = Modifier.fillMaxSize().background(DeepSpaceBlack)) {
+                  Canvas(modifier = Modifier.fillMaxSize()) {
+                      drawCircle(
+                          brush = Brush.radialGradient(listOf(NeonPurple.copy(0.28f), Color.Transparent), center = Offset(size.width * 0.2f, size.height * 0.2f), radius = size.minDimension * 0.7f)
+                      )
+                      drawCircle(
+                          brush = Brush.radialGradient(listOf(ElectricViolet.copy(0.25f), Color.Transparent), center = Offset(size.width * 0.85f, size.height * 0.75f), radius = size.minDimension * 0.8f)
+                      )
+                  }
+                  content()
+              }
+          }
+
+          @Composable
+          fun Modifier.ios27LiquidGlass(shape: Shape = RoundedCornerShape(26.dp), tintOpacity: Float = 0.16f): Modifier = this
+              .clip(shape)
+              .background(Brush.linearGradient(listOf(GlassWhite.copy(0.14f), NeonPurple.copy(tintOpacity), ElectricViolet.copy(0.08f))))
+              .border(1.2.dp, Brush.linearGradient(listOf(GlassWhite.copy(0.55f), LiquidLavender.copy(0.35f), NeonPurple.copy(0.15f))), shape)
+
+          @Composable
+          fun HomeScreen(shizukuReady: Boolean, onRequestShizuku: () -> Unit, onEnterGameSpace: () -> Unit) {
+              val context = LocalContext.current
+              Box(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp)) {
+                  Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 90.dp)) {
+                      Spacer(modifier = Modifier.height(12.dp))
+                      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                          Text("Home", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+                          Row(verticalAlignment = Alignment.CenterVertically) {
+                              Column(horizontalAlignment = Alignment.End) {
+                                  Text("PLAYER ID", color = LiquidLavender.copy(0.6f), fontSize = 10.sp, letterSpacing = 1.5.sp)
+                                  Text("0B6433DC", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                              }
+                              Spacer(modifier = Modifier.width(12.dp))
+                              Box(modifier = Modifier.size(44.dp).ios27LiquidGlass(CircleShape, 0.25f).clickable { onRequestShizuku() }, contentAlignment = Alignment.Center) {
+                                  Icon(if (shizukuReady) Icons.Default.VerifiedUser else Icons.Default.PersonOutline, contentDescription = null, tint = if (shizukuReady) NeonPurple else Color.White)
+                              }
+                          }
+                      }
+                      Spacer(modifier = Modifier.height(26.dp))
+                      Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                          Box(modifier = Modifier.size(110.dp).ios27LiquidGlass(CircleShape, 0.35f), contentAlignment = Alignment.Center) {
+                              Text("Z", color = LiquidLavender, fontSize = 52.sp, fontWeight = FontWeight.Black)
+                          }
+                          Spacer(modifier = Modifier.width(22.dp))
+                          Column {
+                              Text("TOUCH OPTIMIZE", color = LiquidLavender.copy(0.75f), fontSize = 12.sp, letterSpacing = 3.sp)
+                              Text("ZAYON", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp)
+                              Text(if (shizukuReady) "v1.0.5 • Shizuku Aktif" else "v1.0.5 • Klik untuk Shizuku", color = LiquidLavender, fontSize = 12.sp, modifier = Modifier.clickable { onRequestShizuku() })
+                          }
+                      }
+                      Spacer(modifier = Modifier.height(28.dp))
+                      Column(modifier = Modifier.fillMaxWidth().ios27LiquidGlass(RoundedCornerShape(28.dp), 0.22f).clickable { onEnterGameSpace() }.padding(20.dp)) {
+                          Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                              Row(verticalAlignment = Alignment.CenterVertically) {
+                                  Box(modifier = Modifier.size(54.dp).ios27LiquidGlass(RoundedCornerShape(16.dp), 0.3f), contentAlignment = Alignment.Center) {
+                                      Icon(Icons.Default.RocketLaunch, contentDescription = null, tint = LiquidLavender)
+                                  }
+                                  Spacer(modifier = Modifier.width(16.dp))
+                                  Column {
+                                      Text("Enter", color = LiquidLavender.copy(0.7f), fontSize = 13.sp)
+                                      Text("Game Space", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                                  }
+                              }
+                              Box(modifier = Modifier.size(46.dp).clip(CircleShape).background(Brush.linearGradient(listOf(LiquidLavender, NeonPurple))), contentAlignment = Alignment.Center) {
+                                  Icon(Icons.Default.ArrowForward, contentDescription = null, tint = DeepSpaceBlack)
+                              }
+                          }
+                          Spacer(modifier = Modifier.height(16.dp))
+                          Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                              Text("Token  30 / 300", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                              Spacer(modifier = Modifier.width(12.dp))
+                              LinearProgressIndicator(progress = 0.15f, modifier = Modifier.weight(1f).height(6.dp).clip(CircleShape), color = NeonPurple, trackColor = Color.White.copy(0.12f))
+                          }
+                      }
+                      Spacer(modifier = Modifier.height(26.dp))
+                      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                          Text("Game Library  1/10", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                          Box(modifier = Modifier.ios27LiquidGlass(CircleShape, 0.18f).padding(horizontal = 14.dp, vertical = 6.dp)) {
+                              Text("Add +", color = Color.White, fontSize = 13.sp)
+                          }
+                      }
+                      Spacer(modifier = Modifier.height(14.dp))
+                      Box(modifier = Modifier.fillMaxWidth().height(185.dp).ios27LiquidGlass(RoundedCornerShape(28.dp), 0.25f).padding(22.dp)) {
+                          Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                              Column(modifier = Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+                                  Column {
+                                      Text("LAST PLAYED", color = LiquidLavender.copy(0.7f), fontSize = 11.sp)
+                                      Text("Free Fire MAX", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+                                      Text("⏱ 0m", color = Color.White.copy(0.65f), fontSize = 13.sp)
+                                  }
+                                  Button(
+                                      onClick = {
+                                          val intent = context.packageManager.getLaunchIntentForPackage("com.dts.freefiremax")
+                                          if (intent != null) context.startActivity(intent) else onEnterGameSpace()
+                                      },
+                                      colors = ButtonDefaults.buttonColors(containerColor = NeonPurple),
+                                      shape = CircleShape
+                                  ) {
+                                      Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
+                                      Spacer(modifier = Modifier.width(6.dp))
+                                      Text("Play", color = Color.White, fontWeight = FontWeight.Bold)
+                                  }
+                              }
+                              Box(modifier = Modifier.size(95.dp).ios27LiquidGlass(RoundedCornerShape(24.dp), 0.4f), contentAlignment = Alignment.Center) {
+                                  Text("FF MAX", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
+                              }
+                          }
+                      }
+                  }
+                  Row(modifier = Modifier.align(Alignment.BottomCenter).ios27LiquidGlass(CircleShape, 0.28f).padding(horizontal = 18.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                      IconButton(onClick = { onEnterGameSpace() }) { Icon(Icons.Default.GridView, contentDescription = null, tint = Color.White.copy(0.7f)) }
+                      Row(modifier = Modifier.clip(CircleShape).background(NeonPurple.copy(0.45f)).padding(horizontal = 18.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                          Icon(Icons.Default.Home, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                          Spacer(modifier = Modifier.width(6.dp))
+                          Text("Home", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                      }
+                      IconButton(onClick = { onEnterGameSpace() }) { Icon(Icons.Default.TouchApp, contentDescription = null, tint = Color.White.copy(0.7f)) }
+                  }
+              }
+          }
+
+          @Composable
+          fun GraphicsConfigScreen(shizukuReady: Boolean, onBack: () -> Unit, onApplyGraphics: (Int, Boolean, Boolean, Boolean) -> Unit) {
+              var selectedPreset by remember { mutableStateOf("Custom") }
+              var sliderValue by remember { mutableFloatStateOf(4f) }
+              var sharpPixels by remember { mutableStateOf(true) }
+              var hardDistanceSteps by remember { mutableStateOf(true) }
+              var enableFFMax by remember { mutableStateOf(true) }
+              var splitRatio by remember { mutableFloatStateOf(0.5f) }
+              val detailLabels = listOf("Original", "Light", "Retro", "Blocky", "Extreme")
+
+              Row(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                  Column(modifier = Modifier.weight(0.95f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+                      Row(verticalAlignment = Alignment.CenterVertically) {
+                          Box(modifier = Modifier.size(40.dp).ios27LiquidGlass(CircleShape, 0.25f).clickable { onBack() }, contentAlignment = Alignment.Center) {
+                              Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+                          }
+                          Spacer(modifier = Modifier.width(12.dp))
+                          Column {
+                              Text("ZAYON GAME SPACE", color = LiquidLavender.copy(0.7f), fontSize = 10.sp)
+                              Text("Light Texture", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                          }
+                      }
+                      Box(
+                          modifier = Modifier.fillMaxWidth().weight(1f).padding(vertical = 10.dp).ios27LiquidGlass(RoundedCornerShape(22.dp), 0.18f)
+                              .pointerInput(Unit) { detectHorizontalDragGestures { change, _ -> splitRatio = (change.position.x / size.width).coerceIn(0.15f, 0.85f) } }
+                      ) {
+                          Canvas(modifier = Modifier.fillMaxSize()) {
+                              val splitX = size.width * splitRatio
+                              drawRect(color = Color(0xFF3A3532), topLeft = Offset.Zero, size = androidx.compose.ui.geometry.Size(splitX, size.height))
+                              drawRect(brush = Brush.verticalGradient(listOf(Color(0xFF2E233A), Color(0xFF43533B))), topLeft = Offset(splitX, 0f), size = androidx.compose.ui.geometry.Size(size.width - splitX, size.height))
+                              drawLine(color = Color.White, start = Offset(splitX, 0f), end = Offset(splitX, size.height), strokeWidth = 4f)
+                          }
+                          Text("BEFORE", color = Color.White, fontSize = 10.sp, modifier = Modifier.padding(12.dp).align(Alignment.TopStart))
+                          Text("AFTER", color = Color.White, fontSize = 10.sp, modifier = Modifier.padding(12.dp).align(Alignment.TopEnd))
+                      }
+                      Row(modifier = Modifier.fillMaxWidth().ios27LiquidGlass(RoundedCornerShape(20.dp), 0.22f).padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                          Column {
+                              Text("Free Fire MAX", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                              Text("Enable for Free Fire MAX", color = LiquidLavender.copy(0.7f), fontSize = 11.sp)
+                          }
+                          Switch(checked = enableFFMax, onCheckedChange = { enableFFMax = it }, colors = SwitchDefaults.colors(checkedTrackColor = NeonPurple))
+                      }
+                  }
+
+                  Column(modifier = Modifier.weight(1.25f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+                      Column {
+                          Text("QUICK PRESET", color = LiquidLavender.copy(0.7f), fontSize = 11.sp)
+                          Spacer(modifier = Modifier.height(6.dp))
+                          Row(modifier = Modifier.fillMaxWidth().ios27LiquidGlass(RoundedCornerShape(18.dp), 0.18f).padding(4.dp)) {
+                              listOf("Smooth", "Retro", "Full Blocky", "Custom").forEach { preset ->
+                                  val active = selectedPreset == preset
+                                  Box(
+                                      modifier = Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(if (active) NeonPurple else Color.Transparent)
+                                          .clickable { selectedPreset = preset; sliderValue = when (preset) { "Smooth" -> 1f; "Retro" -> 2f; "Full Blocky" -> 3f; else -> 4f } }
+                                          .padding(vertical = 8.dp),
+                                      contentAlignment = Alignment.Center
+                                  ) {
+                                      Text(preset, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                  }
+                              }
+                          }
+                          Spacer(modifier = Modifier.height(12.dp))
+                          Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                              Text("Texture Detail", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                              Text(detailLabels[sliderValue.toInt().coerceIn(0, 4)], color = LiquidLavender, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+                          }
+                          Slider(value = sliderValue, onValueChange = { sliderValue = it; selectedPreset = "Custom" }, valueRange = 0f..4f, steps = 3, colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = NeonPurple))
+                          Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                              Row(modifier = Modifier.weight(1f).ios27LiquidGlass(RoundedCornerShape(16.dp), 0.18f).padding(10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                  Text("Sharp Pixels", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                  Switch(checked = sharpPixels, onCheckedChange = { sharpPixels = it }, colors = SwitchDefaults.colors(checkedTrackColor = NeonPurple))
+                              }
+                              Row(modifier = Modifier.weight(1f).ios27LiquidGlass(RoundedCornerShape(16.dp), 0.18f).padding(10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                  Text("Hard Steps", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                  Switch(checked = hardDistanceSteps, onCheckedChange = { hardDistanceSteps = it }, colors = SwitchDefaults.colors(checkedTrackColor = NeonPurple))
+                              }
+                          }
+                      }
+                      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                          Box(modifier = Modifier.weight(0.9f).height(46.dp).ios27LiquidGlass(RoundedCornerShape(16.dp), 0.16f).clickable { sliderValue = 0f; onApplyGraphics(0, false, false, false) }, contentAlignment = Alignment.Center) {
+                              Text("Reset to Original", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                          }
+                          Box(modifier = Modifier.weight(1.3f).height(46.dp).clip(RoundedCornerShape(16.dp)).background(Brush.horizontalGradient(listOf(NeonPurple, LiquidLavender))).clickable { onApplyGraphics(sliderValue.toInt(), sharpPixels, hardDistanceSteps, enableFFMax) }, contentAlignment = Alignment.Center) {
+                              Text("Save", color = DeepSpaceBlack, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                          }
+                      }
+                  }
+              }
+          }
+          EOF
+
+      - name: Bina APK (Assemble Debug)
+        run: gradle assembleDebug
+
+      - name: Sediakan APK untuk Muat Turun
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zayon-LiquidGlass-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
