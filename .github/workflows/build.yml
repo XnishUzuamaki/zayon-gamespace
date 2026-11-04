@@ -2,59 +2,79 @@ name: Build Zayon APK Final
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: ["main", "master"]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: "17"
+          distribution: temurin
 
-      - name: Setup Gradle CLI
-        uses: gradle/actions/setup-gradle@v3
+      - name: Setup Gradle 8.5 (cache disabled)
+        uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: '8.5'
+          gradle-version: "8.5"
+          cache-disabled: true
 
       - name: Jana Struktur Projek Penuh
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p app/src/main/java/com/xnish/gamespace
 
-          cat << 'EOF' > settings.gradle.kts
-          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
-          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          cat <<'EOF' > settings.gradle.kts
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
           rootProject.name = "XnishGameSpace"
           include(":app")
           EOF
 
-          cat << 'EOF' > build.gradle.kts
+          cat <<'EOF' > build.gradle.kts
           plugins {
               id("com.android.application") version "8.2.0" apply false
               id("org.jetbrains.kotlin.android") version "1.9.20" apply false
           }
           EOF
 
-          cat << 'EOF' > gradle.properties
+          cat <<'EOF' > gradle.properties
           android.useAndroidX=true
-          org.gradle.jvmargs=-Xmx2048m
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          org.gradle.parallel=true
           EOF
 
-          cat << 'EOF' > app/build.gradle.kts
+          cat <<'EOF' > app/build.gradle.kts
           plugins {
               id("com.android.application")
               id("org.jetbrains.kotlin.android")
           }
+
           android {
               namespace = "com.xnish.gamespace"
               compileSdk = 34
+
               defaultConfig {
                   applicationId = "com.xnish.gamespace"
                   minSdk = 26
@@ -62,16 +82,33 @@ jobs:
                   versionCode = 13
                   versionName = "1.1.3"
               }
-              buildFeatures { compose = true }
-              composeOptions { kotlinCompilerExtensionVersion = "1.5.3" }
-              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-              kotlinOptions { jvmTarget = "17" }
+
+              buildFeatures {
+                  compose = true
+              }
+
+              composeOptions {
+                  // Kotlin 1.9.20 dipadankan dengan Compose Compiler 1.5.4.
+                  kotlinCompilerExtensionVersion = "1.5.4"
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
           }
+
           dependencies {
               implementation("androidx.core:core-ktx:1.12.0")
               implementation("androidx.activity:activity-compose:1.8.2")
               implementation(platform("androidx.compose:compose-bom:2024.02.00"))
               implementation("androidx.compose.ui:ui")
+              implementation("androidx.compose.ui:ui-graphics")
+              implementation("androidx.compose.ui:ui-tooling-preview")
               implementation("androidx.compose.material3:material3")
               implementation("androidx.compose.material:material-icons-extended")
               implementation("dev.rikka.shizuku:api:13.1.5")
@@ -79,25 +116,28 @@ jobs:
           }
           EOF
 
-          cat << 'EOF' > app/src/main/AndroidManifest.xml
+          cat <<'EOF' > app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
               <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
               <application
                   android:allowBackup="true"
                   android:label="Zayon Game Space"
                   android:supportsRtl="true"
                   android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
-                      android:configChanges="orientation|screenSize">
+                      android:configChanges="orientation|screenSize|keyboardHidden">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
+
                   <provider
                       android:name="rikka.shizuku.ShizukuProvider"
                       android:authorities="${applicationId}.shizuku"
@@ -109,7 +149,7 @@ jobs:
           </manifest>
           EOF
 
-          cat << 'EOF' > app/src/main/java/com/xnish/gamespace/MainActivity.kt
+          cat <<'EOF' > app/src/main/java/com/xnish/gamespace/MainActivity.kt
           package com.xnish.gamespace
 
           import android.content.Context
@@ -154,13 +194,13 @@ jobs:
           import java.io.File
           import kotlin.math.roundToInt
 
-          val BlackBg = Color(0xFF07030F)
-          val PurpleNeon = Color(0xFFB845FF)
-          val VioletG = Color(0xFF7B2CBF)
-          val Lavender = Color(0xFFE0AAFF)
-          val WhiteG = Color(0xFFFFFFFF)
+          private val BlackBg = Color(0xFF07030F)
+          private val PurpleNeon = Color(0xFFB845FF)
+          private val VioletG = Color(0xFF7B2CBF)
+          private val Lavender = Color(0xFFE0AAFF)
+          private val WhiteG = Color(0xFFFFFFFF)
 
-          data class AppInfo(val name: String, val pkg: String)
+          private data class AppInfo(val name: String, val pkg: String)
 
           class MainActivity : ComponentActivity(), Shizuku.OnRequestPermissionResultListener {
               private var isShizukuOk by mutableStateOf(false)
@@ -175,6 +215,7 @@ jobs:
 
                   setContent {
                       var screen by remember { mutableStateOf("HOME") }
+
                       LaunchedEffect(screen) {
                           requestedOrientation = if (screen == "HOME" || screen == "PICKER") {
                               ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -182,102 +223,273 @@ jobs:
                               ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                           }
                       }
+
                       Box(modifier = Modifier.fillMaxSize().background(BlackBg)) {
                           Canvas(modifier = Modifier.fillMaxSize()) {
-                              drawCircle(brush = Brush.radialGradient(listOf(PurpleNeon.copy(0.3f), Color.Transparent), center = Offset(size.width * 0.2f, size.height * 0.2f), radius = size.minDimension * 0.75f))
+                              drawCircle(
+                                  brush = Brush.radialGradient(
+                                      listOf(PurpleNeon.copy(alpha = 0.3f), Color.Transparent),
+                                      center = Offset(size.width * 0.2f, size.height * 0.2f),
+                                      radius = size.minDimension * 0.75f
+                                  )
+                              )
                           }
+
                           when (screen) {
-                              "HOME" -> HomeScr(isShizukuOk, { askShizuku() }, { screen = "SELECT" }, { screen = "PICKER" }, targetName) { launch(targetPkg) }
-                              "PICKER" -> PickerScr({ screen = "HOME" }) { n, p -> targetName = n; targetPkg = p; screen = "HOME" }
-                              "SELECT" -> SelectScr(currentMode, targetName, { screen = "HOME" }, { screen = "LIGHT" }, { screen = "ADV" }, { batSaver() }) { launch(targetPkg) }
-                              "LIGHT" -> LightScr(isShizukuOk, { screen = "SELECT" }) { m, s, sh, hd -> currentMode = m.uppercase(); applyLight(targetPkg, s, sh, hd) }
-                              "ADV" -> AdvScr(isShizukuOk, { screen = "SELECT" }) { r, f, ms, dv, md, fx, an -> applyAdv(targetPkg, r, f, ms, dv, md, fx, an) }
+                              "HOME" -> HomeScr(
+                                  isShizukuOk,
+                                  { askShizuku() },
+                                  { screen = "SELECT" },
+                                  { screen = "PICKER" },
+                                  targetName
+                              ) { launch(targetPkg) }
+
+                              "PICKER" -> PickerScr({ screen = "HOME" }) { name, pkg ->
+                                  targetName = name
+                                  targetPkg = pkg
+                                  screen = "HOME"
+                              }
+
+                              "SELECT" -> SelectScr(
+                                  currentMode,
+                                  targetName,
+                                  { screen = "HOME" },
+                                  { screen = "LIGHT" },
+                                  { screen = "ADV" },
+                                  { batSaver() }
+                              ) { launch(targetPkg) }
+
+                              "LIGHT" -> LightScr(isShizukuOk, { screen = "SELECT" }) { mode, scale, sharp, hard ->
+                                  currentMode = mode.uppercase()
+                                  applyLight(targetPkg, scale, sharp, hard)
+                              }
+
+                              "ADV" -> AdvScr(isShizukuOk, { screen = "SELECT" }) { res, fps, msaa, driver, mode, fixed, anim ->
+                                  applyAdv(targetPkg, res, fps, msaa, driver, mode, fixed, anim)
+                              }
                           }
                       }
                   }
               }
 
-              private fun checkShizuku() {
-                  try { if (Shizuku.pingBinder()) isShizukuOk = Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED } catch (_: Exception) {}
+              override fun onDestroy() {
+                  Shizuku.removeRequestPermissionResultListener(this)
+                  super.onDestroy()
               }
+
+              private fun checkShizuku() {
+                  try {
+                      isShizukuOk = Shizuku.pingBinder() &&
+                          Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+                  } catch (_: Exception) {
+                      isShizukuOk = false
+                  }
+              }
+
               private fun askShizuku() {
                   try {
-                      if (!Shizuku.pingBinder()) { Toast.makeText(this, "Buka Shizuku dulu!", Toast.LENGTH_SHORT).show(); return }
-                      if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) Shizuku.requestPermission(1001)
-                      else { isShizukuOk = true; Toast.makeText(this, "Shizuku Aktif!", Toast.LENGTH_SHORT).show() }
-                  } catch (e: Exception) { Toast.makeText(this, "Ralat: ${e.message}", Toast.LENGTH_SHORT).show() }
+                      if (!Shizuku.pingBinder()) {
+                          Toast.makeText(this, "Buka Shizuku dahulu!", Toast.LENGTH_SHORT).show()
+                          return
+                      }
+                      if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+                          Shizuku.requestPermission(1001)
+                      } else {
+                          isShizukuOk = true
+                          Toast.makeText(this, "Shizuku Aktif!", Toast.LENGTH_SHORT).show()
+                      }
+                  } catch (e: Exception) {
+                      Toast.makeText(this, "Ralat: ${e.message}", Toast.LENGTH_SHORT).show()
+                  }
               }
-              override fun onRequestPermissionResult(req: Int, res: Int) { isShizukuOk = res == PackageManager.PERMISSION_GRANTED }
+
+              override fun onRequestPermissionResult(requestCode: Int, grantResult: Int) {
+                  isShizukuOk = grantResult == PackageManager.PERMISSION_GRANTED
+                  runOnUiThread {
+                      Toast.makeText(
+                          this,
+                          if (isShizukuOk) "Kebenaran Shizuku diberikan" else "Kebenaran Shizuku ditolak",
+                          Toast.LENGTH_SHORT
+                      ).show()
+                  }
+              }
 
               private fun launch(pkg: String) {
-                  val i = packageManager.getLaunchIntentForPackage(pkg)
-                  if (i != null) { i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(i) }
-                  else Toast.makeText(this, "Aplikasi tiada pelancar.", Toast.LENGTH_SHORT).show()
+                  val intent = packageManager.getLaunchIntentForPackage(pkg)
+                  if (intent != null) {
+                      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                      startActivity(intent)
+                  } else {
+                      Toast.makeText(this, "Aplikasi tiada pelancar.", Toast.LENGTH_SHORT).show()
+                  }
               }
 
               private fun batSaver() {
-                  if (!isShizukuOk) { askShizuku(); return }
-                  shell("cmd power set-fixed-performance-mode-enabled false ; settings put global low_power 1 ; cmd power save-mode on")
-                  Toast.makeText(this, "Mod Hemat Bateri Diaktifkan!", Toast.LENGTH_SHORT).show()
+                  if (!isShizukuOk) {
+                      askShizuku()
+                      return
+                  }
+                  val ok = shell(
+                      "settings put global low_power 1"
+                  )
+                  Toast.makeText(
+                      this,
+                      if (ok) "Arahan mod jimat bateri dihantar." else "Arahan gagal dijalankan.",
+                      Toast.LENGTH_SHORT
+                  ).show()
               }
 
               private fun applyLight(pkg: String, scale: Float, sharp: Boolean, hard: Boolean) {
-                  if (!isShizukuOk) { askShizuku(); return }
+                  if (!isShizukuOk) {
+                      askShizuku()
+                      return
+                  }
+                  val safeScale = scale.coerceIn(0.2f, 1.0f)
                   val cmds = listOf(
-                      "cmd game mode custom $pkg",
-                      "device_config put game_overlay $pkg mode=2,downscaleFactor=$scale:mode=3,downscaleFactor=$scale",
-                      "cmd game downscale $scale $pkg",
-                      "setprop debug.hwui.renderer skiagl",
+                      "device_config put game_overlay $pkg mode=2,downscaleFactor=$safeScale",
                       if (sharp) "setprop debug.hwui.filter_quality nearest" else "setprop debug.hwui.filter_quality low",
-                      if (hard) "setprop debug.egl.force_msaa false" else "setprop debug.egl.force_msaa true",
-                      "am force-stop $pkg"
+                      if (hard) "setprop debug.egl.force_msaa false" else "setprop debug.egl.force_msaa true"
                   )
-                  shell(cmds.joinToString(" ; "))
-                  Toast.makeText(this, "Grafik Low-Poly Blocky Disimpan!", Toast.LENGTH_LONG).show()
+                  val ok = shell(cmds.joinToString(" ; "))
+                  Toast.makeText(
+                      this,
+                      if (ok) "Arahan grafik dihantar. Kesan bergantung pada Android dan game." else "Arahan tidak berjaya.",
+                      Toast.LENGTH_LONG
+                  ).show()
               }
 
-              private fun applyAdv(pkg: String, res: Int, fps: String, msaa: Boolean, drv: String, mode: String, fixed: Boolean, anim: String) {
-                  if (!isShizukuOk) { askShizuku(); return }
-                  val scale = res / 100f
-                  val m = when(mode) { "Performance" -> "2"; "Saver" -> "1"; else -> "0" }
-                  val cmds = mutableListOf("cmd game mode $m $pkg", "cmd game downscale $scale $pkg", "device_config put game_overlay $pkg mode=2,downscaleFactor=$scale", if (fixed) "cmd power set-fixed-performance-mode-enabled true" else "cmd power set-fixed-performance-mode-enabled false")
-                  if (drv == "Game Driver") cmds.add("settings put global updatable_driver_all_apps 1")
-                  else if (drv == "Vulkan Experimental") cmds.add("settings put global angle_gl_driver_all_angle 1")
-                  val av = when(anim) { "Fast" -> "0.5"; "Off" -> "0.0"; else -> "1.0" }
-                  cmds.add("settings put global animator_duration_scale $av")
-                  cmds.add("settings put global window_animation_scale $av")
-                  cmds.add("am force-stop $pkg")
-                  shell(cmds.joinToString(" ; "))
-                  Toast.makeText(this, "Tetapan Lanjutan Disimpan!", Toast.LENGTH_LONG).show()
+              private fun applyAdv(
+                  pkg: String,
+                  res: Int,
+                  fps: String,
+                  msaa: Boolean,
+                  drv: String,
+                  mode: String,
+                  fixed: Boolean,
+                  anim: String
+              ) {
+                  if (!isShizukuOk) {
+                      askShizuku()
+                      return
+                  }
+
+                  val scale = (res / 100f).coerceIn(0.3f, 1.0f)
+                  val gameMode = when (mode) {
+                      "Performance" -> "2"
+                      "Saver" -> "1"
+                      else -> "0"
+                  }
+                  val animationScale = when (anim) {
+                      "Fast" -> "0.5"
+                      "Off" -> "0.0"
+                      else -> "1.0"
+                  }
+
+                  val cmds = mutableListOf(
+                      "cmd game mode $gameMode $pkg",
+                      "device_config put game_overlay $pkg mode=2,downscaleFactor=$scale",
+                      "cmd power set-fixed-performance-mode-enabled ${if (fixed) "true" else "false"}",
+                      "settings put global animator_duration_scale $animationScale",
+                      "settings put global window_animation_scale $animationScale",
+                      "settings put global transition_animation_scale $animationScale"
+                  )
+
+                  if (drv == "Game Driver") {
+                      cmds.add("settings put global updatable_driver_all_apps 1")
+                  }
+
+                  val ok = shell(cmds.joinToString(" ; "))
+                  val note = "FPS $fps dan MSAA ${if (msaa) "ON" else "OFF"} dipilih dalam UI; Android/game mungkin tidak membenarkan aplikasi lain memaksanya."
+                  Toast.makeText(
+                      this,
+                      if (ok) "Tetapan yang disokong dihantar. $note" else "Arahan tidak berjaya. $note",
+                      Toast.LENGTH_LONG
+                  ).show()
               }
 
-              private fun shell(cmd: String) {
-                  try {
-                      val m = Shizuku::class.java.getDeclaredMethod("newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java)
-                      m.isAccessible = true
-                      val p = m.invoke(null, arrayOf("sh", "-c", cmd), null, null) as Process
-                      p.waitFor()
-                  } catch (_: Exception) {}
+              private fun shell(command: String): Boolean {
+                  return try {
+                      val method = Shizuku::class.java.getDeclaredMethod(
+                          "newProcess",
+                          Array<String>::class.java,
+                          Array<String>::class.java,
+                          String::class.java
+                      )
+                      method.isAccessible = true
+                      val process = method.invoke(
+                          null,
+                          arrayOf("sh", "-c", command),
+                          null,
+                          null
+                      ) as Process
+                      val exitCode = process.waitFor()
+                      exitCode == 0
+                  } catch (e: Exception) {
+                      Toast.makeText(this, "Shizuku shell error: ${e.message}", Toast.LENGTH_LONG).show()
+                      false
+                  }
               }
           }
 
           @Composable
-          fun Modifier.glass(shape: Shape = RoundedCornerShape(24.dp), t: Float = 0.18f): Modifier = this
+          private fun Modifier.glass(
+              shape: Shape = RoundedCornerShape(24.dp),
+              tint: Float = 0.18f
+          ): Modifier = this
               .clip(shape)
-              .background(Brush.linearGradient(listOf(WhiteG.copy(0.15f), PurpleNeon.copy(t), VioletG.copy(0.1f))))
-              .border(1.2.dp, Brush.linearGradient(listOf(WhiteG.copy(0.55f), Lavender.copy(0.38f), PurpleNeon.copy(0.18f))), shape)
+              .background(
+                  Brush.linearGradient(
+                      listOf(
+                          WhiteG.copy(alpha = 0.15f),
+                          PurpleNeon.copy(alpha = tint),
+                          VioletG.copy(alpha = 0.1f)
+                      )
+                  )
+              )
+              .border(
+                  1.2.dp,
+                  Brush.linearGradient(
+                      listOf(
+                          WhiteG.copy(alpha = 0.55f),
+                          Lavender.copy(alpha = 0.38f),
+                          PurpleNeon.copy(alpha = 0.18f)
+                      )
+                  ),
+                  shape
+              )
 
           @Composable
-          fun HomeScr(ok: Boolean, req: () -> Unit, enter: () -> Unit, picker: () -> Unit, name: String, play: () -> Unit) {
+          private fun HomeScr(
+              ok: Boolean,
+              requestShizuku: () -> Unit,
+              enter: () -> Unit,
+              picker: () -> Unit,
+              name: String,
+              play: () -> Unit
+          ) {
               Box(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-                  Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 90.dp)) {
+                  Column(
+                      modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 90.dp)
+                  ) {
                       Spacer(modifier = Modifier.height(12.dp))
-                      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                      Row(
+                          modifier = Modifier.fillMaxWidth(),
+                          horizontalArrangement = Arrangement.SpaceBetween,
+                          verticalAlignment = Alignment.CenterVertically
+                      ) {
                           Text("Home", color = WhiteG, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
-                          Box(modifier = Modifier.size(44.dp).glass(CircleShape, 0.28f).clickable { req() }, contentAlignment = Alignment.Center) {
-                              Icon(if (ok) Icons.Default.VerifiedUser else Icons.Default.PersonOutline, contentDescription = null, tint = if (ok) PurpleNeon else WhiteG)
+                          Box(
+                              modifier = Modifier.size(44.dp).glass(CircleShape, 0.28f).clickable { requestShizuku() },
+                              contentAlignment = Alignment.Center
+                          ) {
+                              Icon(
+                                  if (ok) Icons.Default.VerifiedUser else Icons.Default.PersonOutline,
+                                  contentDescription = "Shizuku permission",
+                                  tint = if (ok) PurpleNeon else WhiteG
+                              )
                           }
                       }
+
                       Spacer(modifier = Modifier.height(26.dp))
                       Row(verticalAlignment = Alignment.CenterVertically) {
                           Box(modifier = Modifier.size(105.dp).glass(CircleShape, 0.35f), contentAlignment = Alignment.Center) {
@@ -285,52 +497,99 @@ jobs:
                           }
                           Spacer(modifier = Modifier.width(20.dp))
                           Column {
-                              Text("TOUCH OPTIMIZE", color = Lavender.copy(0.75f), fontSize = 12.sp, letterSpacing = 3.sp)
+                              Text("TOUCH OPTIMIZE", color = Lavender.copy(alpha = 0.75f), fontSize = 12.sp, letterSpacing = 3.sp)
                               Text("ZAYON", color = WhiteG, fontSize = 36.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp)
-                              Text(if (ok) "Shizuku Aktif" else "Klik Untuk Shizuku", color = Lavender, fontSize = 11.sp, modifier = Modifier.clickable { req() })
+                              Text(
+                                  if (ok) "Shizuku Aktif" else "Klik Untuk Shizuku",
+                                  color = Lavender,
+                                  fontSize = 11.sp,
+                                  modifier = Modifier.clickable { requestShizuku() }
+                              )
                           }
                       }
+
                       Spacer(modifier = Modifier.height(28.dp))
-                      Column(modifier = Modifier.fillMaxWidth().glass(RoundedCornerShape(28.dp), 0.24f).clickable { enter() }.padding(20.dp)) {
-                          Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                      Column(
+                          modifier = Modifier.fillMaxWidth().glass(RoundedCornerShape(28.dp), 0.24f).clickable { enter() }.padding(20.dp)
+                      ) {
+                          Row(
+                              modifier = Modifier.fillMaxWidth(),
+                              horizontalArrangement = Arrangement.SpaceBetween,
+                              verticalAlignment = Alignment.CenterVertically
+                          ) {
                               Row(verticalAlignment = Alignment.CenterVertically) {
-                                  Box(modifier = Modifier.size(54.dp).glass(RoundedCornerShape(16.dp), 0.3f), contentAlignment = Alignment.Center) {
+                                  Box(
+                                      modifier = Modifier.size(54.dp).glass(RoundedCornerShape(16.dp), 0.3f),
+                                      contentAlignment = Alignment.Center
+                                  ) {
                                       Icon(Icons.Default.RocketLaunch, contentDescription = null, tint = Lavender)
                                   }
                                   Spacer(modifier = Modifier.width(16.dp))
                                   Column {
-                                      Text("Enter", color = Lavender.copy(0.7f), fontSize = 13.sp)
+                                      Text("Enter", color = Lavender.copy(alpha = 0.7f), fontSize = 13.sp)
                                       Text("Game Space", color = WhiteG, fontSize = 21.sp, fontWeight = FontWeight.Bold)
                                   }
                               }
-                              Box(modifier = Modifier.size(46.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Lavender, PurpleNeon))), contentAlignment = Alignment.Center) {
+                              Box(
+                                  modifier = Modifier.size(46.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Lavender, PurpleNeon))),
+                                  contentAlignment = Alignment.Center
+                              ) {
                                   Icon(Icons.Default.ArrowForward, contentDescription = null, tint = BlackBg)
                               }
                           }
                       }
+
                       Spacer(modifier = Modifier.height(26.dp))
-                      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                      Row(
+                          modifier = Modifier.fillMaxWidth(),
+                          horizontalArrangement = Arrangement.SpaceBetween,
+                          verticalAlignment = Alignment.CenterVertically
+                      ) {
                           Text("Game Library", color = WhiteG, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                          Box(modifier = Modifier.glass(CircleShape, 0.18f).clickable { picker() }.padding(horizontal = 14.dp, vertical = 6.dp)) {
+                          Box(
+                              modifier = Modifier.glass(CircleShape, 0.18f).clickable { picker() }.padding(horizontal = 14.dp, vertical = 6.dp)
+                          ) {
                               Text("Add +", color = WhiteG, fontSize = 13.sp)
                           }
                       }
+
                       Spacer(modifier = Modifier.height(14.dp))
-                      Box(modifier = Modifier.fillMaxWidth().height(185.dp).glass(RoundedCornerShape(28.dp), 0.25f).padding(22.dp)) {
-                          Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                              Column(modifier = Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+                      Box(
+                          modifier = Modifier.fillMaxWidth().height(185.dp).glass(RoundedCornerShape(28.dp), 0.25f).padding(22.dp)
+                      ) {
+                          Row(
+                              modifier = Modifier.fillMaxSize(),
+                              horizontalArrangement = Arrangement.SpaceBetween,
+                              verticalAlignment = Alignment.CenterVertically
+                          ) {
+                              Column(
+                                  modifier = Modifier.fillMaxHeight(),
+                                  verticalArrangement = Arrangement.SpaceBetween
+                              ) {
                                   Column {
-                                      Text("SELECTED", color = Lavender.copy(0.7f), fontSize = 11.sp)
+                                      Text("SELECTED", color = Lavender.copy(alpha = 0.7f), fontSize = 11.sp)
                                       Text(name, color = WhiteG, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
                                   }
-                                  Button(onClick = { play() }, colors = ButtonDefaults.buttonColors(containerColor = PurpleNeon), shape = CircleShape) {
+                                  Button(
+                                      onClick = play,
+                                      colors = ButtonDefaults.buttonColors(containerColor = PurpleNeon),
+                                      shape = CircleShape
+                                  ) {
                                       Icon(Icons.Default.PlayArrow, contentDescription = null, tint = WhiteG)
                                       Spacer(modifier = Modifier.width(6.dp))
                                       Text("Play", color = WhiteG, fontWeight = FontWeight.Bold)
                                   }
                               }
-                              Box(modifier = Modifier.size(95.dp).glass(RoundedCornerShape(24.dp), 0.4f), contentAlignment = Alignment.Center) {
-                                  Icon(Icons.Default.SportsEsports, contentDescription = null, tint = Lavender, modifier = Modifier.size(42.sp))
+                              Box(
+                                  modifier = Modifier.size(95.dp).glass(RoundedCornerShape(24.dp), 0.4f),
+                                  contentAlignment = Alignment.Center
+                              ) {
+                                  Icon(
+                                      Icons.Default.SportsEsports,
+                                      contentDescription = null,
+                                      tint = Lavender,
+                                      modifier = Modifier.size(42.dp)
+                                  )
                               }
                           }
                       }
@@ -339,31 +598,44 @@ jobs:
           }
 
           @Composable
-          fun PickerScr(onBack: () -> Unit, onSel: (String, String) -> Unit) {
-              val ctx = LocalContext.current
+          private fun PickerScr(onBack: () -> Unit, onSelect: (String, String) -> Unit) {
+              val context = LocalContext.current
               val apps = remember {
-                  val pm = ctx.packageManager
+                  val pm = context.packageManager
                   pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                      .filter { (it.flags and ApplicationInfo.FLAG_SYSTEM) == 0 || (it.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0 }
-                      .map { AppInfo(pm.getApplicationLabel(it).toString(), it.packageName) }.sortedBy { it.name }
+                      .filter {
+                          (it.flags and ApplicationInfo.FLAG_SYSTEM) == 0 ||
+                              (it.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                      }
+                      .map { AppInfo(pm.getApplicationLabel(it).toString(), it.packageName) }
+                      .sortedBy { it.name.lowercase() }
               }
+
               Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
                   Row(verticalAlignment = Alignment.CenterVertically) {
-                      Box(modifier = Modifier.size(40.dp).glass(CircleShape, 0.25f).clickable { onBack() }, contentAlignment = Alignment.Center) {
-                          Icon(Icons.Default.ArrowBack, contentDescription = null, tint = WhiteG)
+                      Box(
+                          modifier = Modifier.size(40.dp).glass(CircleShape, 0.25f).clickable { onBack() },
+                          contentAlignment = Alignment.Center
+                      ) {
+                          Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = WhiteG)
                       }
                       Spacer(modifier = Modifier.width(14.dp))
                       Text("Pilih Aplikasi / Game", color = WhiteG, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                   }
                   Spacer(modifier = Modifier.height(16.dp))
                   LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                      items(apps) { app ->
-                          Row(modifier = Modifier.fillMaxWidth().glass(RoundedCornerShape(16.dp), 0.15f).clickable { onSel(app.name, app.pkg) }.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                      items(apps, key = { it.pkg }) { app ->
+                          Row(
+                              modifier = Modifier.fillMaxWidth().glass(RoundedCornerShape(16.dp), 0.15f)
+                                  .clickable { onSelect(app.name, app.pkg) }.padding(16.dp),
+                              horizontalArrangement = Arrangement.SpaceBetween,
+                              verticalAlignment = Alignment.CenterVertically
+                          ) {
                               Column(modifier = Modifier.weight(1f)) {
                                   Text(app.name, color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                  Text(app.pkg, color = WhiteG.copy(0.5f), fontSize = 11.sp)
+                                  Text(app.pkg, color = WhiteG.copy(alpha = 0.5f), fontSize = 11.sp)
                               }
-                              Icon(Icons.Default.AddCircle, contentDescription = null, tint = PurpleNeon)
+                              Icon(Icons.Default.AddCircle, contentDescription = "Select app", tint = PurpleNeon)
                           }
                       }
                   }
@@ -371,45 +643,104 @@ jobs:
           }
 
           @Composable
-          fun SelectScr(mode: String, game: String, onBack: () -> Unit, onLight: () -> Unit, onAdv: () -> Unit, onBat: () -> Unit, onPlay: () -> Unit) {
-              val ctx = LocalContext.current
-              var temp by remember { mutableStateOf("36.5°C") }
-              var bat by remember { mutableStateOf("70%") }
+          private fun SelectScr(
+              mode: String,
+              game: String,
+              onBack: () -> Unit,
+              onLight: () -> Unit,
+              onAdvanced: () -> Unit,
+              onBatterySaver: () -> Unit,
+              onPlay: () -> Unit
+          ) {
+              val context = LocalContext.current
+              var temperature by remember { mutableStateOf("--°C") }
+              var battery by remember { mutableStateOf("--%") }
+
               LaunchedEffect(Unit) {
-                  val f = File("/sys/class/thermal/thermal_zone0/temp")
-                  if (f.exists()) { try { temp = "%.1f°C".format(f.readText().trim().toFloat() / 1000f) } catch (_: Exception) {} }
-                  val bm = ctx.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-                  bat = "${bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)}%"
+                  val thermalFile = File("/sys/class/thermal/thermal_zone0/temp")
+                  if (thermalFile.exists()) {
+                      try {
+                          temperature = "%.1f°C".format(thermalFile.readText().trim().toFloat() / 1000f)
+                      } catch (_: Exception) {
+                          temperature = "Tidak tersedia"
+                      }
+                  }
+                  val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+                  battery = "${batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)}%"
               }
+
               Row(modifier = Modifier.fillMaxSize()) {
-                  Column(modifier = Modifier.width(74.dp).fillMaxHeight().background(Color.Black.copy(0.35f)).padding(vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
-                      Box(modifier = Modifier.size(46.dp).glass(CircleShape, 0.35f), contentAlignment = Alignment.Center) { Text("Z", color = Lavender, fontWeight = FontWeight.Black, fontSize = 22.sp) }
-                      Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                  Column(
+                      modifier = Modifier.width(74.dp).fillMaxHeight().background(Color.Black.copy(alpha = 0.35f)).padding(vertical = 18.dp),
+                      horizontalAlignment = Alignment.CenterHorizontally,
+                      verticalArrangement = Arrangement.SpaceBetween
+                  ) {
+                      Box(modifier = Modifier.size(46.dp).glass(CircleShape, 0.35f), contentAlignment = Alignment.Center) {
+                          Text("Z", color = Lavender, fontWeight = FontWeight.Black, fontSize = 22.sp)
+                      }
+                      Column(
+                          horizontalAlignment = Alignment.CenterHorizontally,
+                          verticalArrangement = Arrangement.spacedBy(20.dp)
+                      ) {
                           Row(verticalAlignment = Alignment.CenterVertically) {
                               Box(modifier = Modifier.width(4.dp).height(26.dp).clip(CircleShape).background(Lavender))
                               Spacer(modifier = Modifier.width(6.dp))
-                              Box(modifier = Modifier.size(44.dp).glass(RoundedCornerShape(14.dp), 0.35f), contentAlignment = Alignment.Center) { Icon(Icons.Default.SportsEsports, contentDescription = null, tint = Lavender) }
+                              Box(modifier = Modifier.size(44.dp).glass(RoundedCornerShape(14.dp), 0.35f), contentAlignment = Alignment.Center) {
+                                  Icon(Icons.Default.SportsEsports, contentDescription = null, tint = Lavender)
+                              }
                           }
-                          Icon(Icons.Default.Speed, contentDescription = null, tint = WhiteG.copy(0.45f))
-                          Icon(Icons.Default.BatteryChargingFull, contentDescription = null, tint = Lavender, modifier = Modifier.clickable { onBat() })
-                          Icon(Icons.Default.Tune, contentDescription = null, tint = WhiteG.copy(0.45f), modifier = Modifier.clickable { onAdv() })
+                          Icon(Icons.Default.Speed, contentDescription = null, tint = WhiteG.copy(alpha = 0.45f))
+                          Icon(
+                              Icons.Default.BatteryChargingFull,
+                              contentDescription = "Battery saver",
+                              tint = Lavender,
+                              modifier = Modifier.clickable { onBatterySaver() }
+                          )
+                          Icon(
+                              Icons.Default.Tune,
+                              contentDescription = "Advanced settings",
+                              tint = WhiteG.copy(alpha = 0.45f),
+                              modifier = Modifier.clickable { onAdvanced() }
+                          )
                       }
-                      Box(modifier = Modifier.size(44.dp).glass(CircleShape, 0.2f).clickable { onBack() }, contentAlignment = Alignment.Center) { Icon(Icons.Default.PowerSettingsNew, contentDescription = null, tint = WhiteG.copy(0.8f)) }
+                      Box(
+                          modifier = Modifier.size(44.dp).glass(CircleShape, 0.2f).clickable { onBack() },
+                          contentAlignment = Alignment.Center
+                      ) {
+                          Icon(Icons.Default.PowerSettingsNew, contentDescription = "Back", tint = WhiteG.copy(alpha = 0.8f))
+                      }
                   }
-                  Column(modifier = Modifier.weight(1f).fillMaxHeight().padding(24.dp, 16.dp), verticalArrangement = Arrangement.SpaceBetween) {
+
+                  Column(
+                      modifier = Modifier.weight(1f).fillMaxHeight().padding(horizontal = 24.dp, vertical = 16.dp),
+                      verticalArrangement = Arrangement.SpaceBetween
+                  ) {
                       Column {
-                          Text("ZAYON GAME SPACE", color = Lavender.copy(0.7f), fontSize = 11.sp, letterSpacing = 2.sp)
+                          Text("ZAYON GAME SPACE", color = Lavender.copy(alpha = 0.7f), fontSize = 11.sp, letterSpacing = 2.sp)
                           Text("Select Game", color = WhiteG, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
                       }
-                      Box(modifier = Modifier.width(280.dp).height(165.dp).glass(RoundedCornerShape(24.dp), 0.32f).padding(16.dp)) {
+
+                      Box(
+                          modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth().height(165.dp)
+                              .glass(RoundedCornerShape(24.dp), 0.32f).padding(16.dp)
+                      ) {
                           Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-                              Box(modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(BlackBg.copy(0.75f)).border(1.dp, Lavender.copy(0.4f), RoundedCornerShape(10.dp)).padding(10.dp, 4.dp)) {
+                              Box(
+                                  modifier = Modifier.clip(RoundedCornerShape(10.dp))
+                                      .background(BlackBg.copy(alpha = 0.75f))
+                                      .border(1.dp, Lavender.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                                      .padding(horizontal = 10.dp, vertical = 4.dp)
+                              ) {
                                   Text("MODE | $mode ❖", color = Lavender, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
                               }
-                              Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                              Row(
+                                  modifier = Modifier.fillMaxWidth(),
+                                  horizontalArrangement = Arrangement.SpaceBetween,
+                                  verticalAlignment = Alignment.Bottom
+                              ) {
                                   Column {
                                       Text(game, color = WhiteG, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
-                                      Text("Ready to Play", color = WhiteG.copy(0.7f), fontSize = 12.sp)
+                                      Text("Ready to Play", color = WhiteG.copy(alpha = 0.7f), fontSize = 12.sp)
                                   }
                                   Box(modifier = Modifier.size(30.dp).clip(CircleShape).background(Lavender), contentAlignment = Alignment.Center) {
                                       Icon(Icons.Default.Check, contentDescription = null, tint = BlackBg, modifier = Modifier.size(18.dp))
@@ -417,25 +748,39 @@ jobs:
                               }
                           }
                       }
-                      Row(modifier = Modifier.fillMaxWidth().glass(RoundedCornerShape(24.dp), 0.22f).padding(20.dp, 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                          Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
-                              StatC("TEMP", temp, WhiteG)
-                              StatC("PING", "38 ms", WhiteG)
-                              StatC("BATTERY", bat, Lavender)
+
+                      Row(
+                          modifier = Modifier.fillMaxWidth().glass(RoundedCornerShape(24.dp), 0.22f).padding(horizontal = 14.dp, vertical = 12.dp),
+                          verticalAlignment = Alignment.CenterVertically,
+                          horizontalArrangement = Arrangement.SpaceBetween
+                      ) {
+                          Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                              StatC("TEMP", temperature, WhiteG)
+                              StatC("PING", "-- ms", WhiteG)
+                              StatC("BATTERY", battery, Lavender)
                           }
-                          Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                              Box(modifier = Modifier.height(44.dp).glass(RoundedCornerShape(16.dp), 0.28f).clickable { onLight() }.padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+                          Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                              Box(
+                                  modifier = Modifier.height(44.dp).glass(RoundedCornerShape(16.dp), 0.28f)
+                                      .clickable { onLight() }.padding(horizontal = 12.dp),
+                                  contentAlignment = Alignment.Center
+                              ) {
                                   Row(verticalAlignment = Alignment.CenterVertically) {
                                       Icon(Icons.Default.SettingsSuggest, contentDescription = null, tint = Lavender, modifier = Modifier.size(18.dp))
-                                      Spacer(modifier = Modifier.width(8.dp))
-                                      Text("Light Texture", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                      Spacer(modifier = Modifier.width(6.dp))
+                                      Text("Light Texture", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                   }
                               }
-                              Box(modifier = Modifier.height(44.dp).clip(RoundedCornerShape(16.dp)).background(Brush.horizontalGradient(listOf(Lavender, PurpleNeon))).clickable { onPlay() }.padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
+                              Box(
+                                  modifier = Modifier.height(44.dp).clip(RoundedCornerShape(16.dp))
+                                      .background(Brush.horizontalGradient(listOf(Lavender, PurpleNeon)))
+                                      .clickable { onPlay() }.padding(horizontal = 16.dp),
+                                  contentAlignment = Alignment.Center
+                              ) {
                                   Row(verticalAlignment = Alignment.CenterVertically) {
                                       Icon(Icons.Default.PlayArrow, contentDescription = null, tint = BlackBg, modifier = Modifier.size(20.dp))
                                       Spacer(modifier = Modifier.width(6.dp))
-                                      Text("Free...", color = BlackBg, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+                                      Text("Play", color = BlackBg, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                                   }
                               }
                           }
@@ -445,80 +790,168 @@ jobs:
           }
 
           @Composable
-          fun StatC(l: String, v: String, c: Color) {
+          private fun StatC(label: String, value: String, color: Color) {
               Column {
-                  Text(l, color = WhiteG.copy(0.5f), fontSize = 9.sp, letterSpacing = 1.sp)
+                  Text(label, color = WhiteG.copy(alpha = 0.5f), fontSize = 9.sp, letterSpacing = 1.sp)
                   Spacer(modifier = Modifier.height(2.dp))
-                  Text(v, color = c, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                  Text(value, color = color, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
               }
           }
 
           @Composable
-          fun LightScr(ok: Boolean, onBack: () -> Unit, onApply: (String, Float, Boolean, Boolean) -> Unit) {
+          private fun LightScr(
+              shizukuOk: Boolean,
+              onBack: () -> Unit,
+              onApply: (String, Float, Boolean, Boolean) -> Unit
+          ) {
               var preset by remember { mutableStateOf("Full Blocky") }
               var slider by remember { mutableFloatStateOf(4f) }
               var sharp by remember { mutableStateOf(true) }
               var hard by remember { mutableStateOf(true) }
               var split by remember { mutableFloatStateOf(0.5f) }
               val labels = listOf("Original", "Light", "Retro", "Blocky", "Extreme")
-              Row(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                  Column(modifier = Modifier.weight(0.95f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+
+              Row(
+                  modifier = Modifier.fillMaxSize().padding(16.dp),
+                  horizontalArrangement = Arrangement.spacedBy(16.dp)
+              ) {
+                  Column(
+                      modifier = Modifier.weight(0.95f).fillMaxHeight(),
+                      verticalArrangement = Arrangement.SpaceBetween
+                  ) {
                       Row(verticalAlignment = Alignment.CenterVertically) {
-                          Box(modifier = Modifier.size(40.dp).glass(CircleShape, 0.25f).clickable { onBack() }, contentAlignment = Alignment.Center) { Icon(Icons.Default.ArrowBack, contentDescription = null, tint = WhiteG) }
+                          Box(modifier = Modifier.size(40.dp).glass(CircleShape, 0.25f).clickable { onBack() }, contentAlignment = Alignment.Center) {
+                              Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = WhiteG)
+                          }
                           Spacer(modifier = Modifier.width(12.dp))
                           Column {
-                              Text("ZAYON GAME SPACE", color = Lavender.copy(0.7f), fontSize = 10.sp)
+                              Text("ZAYON GAME SPACE", color = Lavender.copy(alpha = 0.7f), fontSize = 10.sp)
                               Text("Light Texture (Low-Poly)", color = WhiteG, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
                           }
                       }
-                      Box(modifier = Modifier.fillMaxWidth().weight(1f).padding(vertical = 10.dp).glass(RoundedCornerShape(22.dp), 0.18f).pointerInput(Unit) { detectHorizontalDragGestures { c, _ -> split = (c.position.x / size.width).coerceIn(0.15f, 0.85f) } }) {
+
+                      Box(
+                          modifier = Modifier.fillMaxWidth().weight(1f).padding(vertical = 10.dp)
+                              .glass(RoundedCornerShape(22.dp), 0.18f)
+                              .pointerInput(Unit) {
+                                  detectHorizontalDragGestures { change, _ ->
+                                      split = (change.position.x / size.width).coerceIn(0.15f, 0.85f)
+                                  }
+                              }
+                      ) {
                           Canvas(modifier = Modifier.fillMaxSize()) {
-                              val sx = size.width * split
-                              drawRect(color = Color(0xFF3A3532), topLeft = Offset.Zero, size = androidx.compose.ui.geometry.Size(sx, size.height))
-                              drawRect(brush = Brush.verticalGradient(listOf(Color(0xFF1A1522), Color(0xFF2E3B28))), topLeft = Offset(sx, 0f), size = androidx.compose.ui.geometry.Size(size.width - sx, size.height))
-                              drawLine(color = WhiteG, start = Offset(sx, 0f), end = Offset(sx, size.height), strokeWidth = 4f)
+                              val splitX = size.width * split
+                              drawRect(
+                                  color = Color(0xFF3A3532),
+                                  topLeft = Offset.Zero,
+                                  size = androidx.compose.ui.geometry.Size(splitX, size.height)
+                              )
+                              drawRect(
+                                  brush = Brush.verticalGradient(listOf(Color(0xFF1A1522), Color(0xFF2E3B28))),
+                                  topLeft = Offset(splitX, 0f),
+                                  size = androidx.compose.ui.geometry.Size(size.width - splitX, size.height)
+                              )
+                              drawLine(
+                                  color = WhiteG,
+                                  start = Offset(splitX, 0f),
+                                  end = Offset(splitX, size.height),
+                                  strokeWidth = 4f
+                              )
                           }
                           Text("BEFORE", color = WhiteG, fontSize = 10.sp, modifier = Modifier.padding(12.dp).align(Alignment.TopStart))
-                          Text("AFTER (EXTREME)", color = Lavender, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(12.dp).align(Alignment.TopEnd))
+                          Text("AFTER (PREVIEW)", color = Lavender, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(12.dp).align(Alignment.TopEnd))
                       }
                   }
-                  Column(modifier = Modifier.weight(1.25f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+
+                  Column(
+                      modifier = Modifier.weight(1.25f).fillMaxHeight(),
+                      verticalArrangement = Arrangement.SpaceBetween
+                  ) {
                       Column {
-                          Text("QUICK PRESET", color = Lavender.copy(0.7f), fontSize = 11.sp)
+                          Text("QUICK PRESET", color = Lavender.copy(alpha = 0.7f), fontSize = 11.sp)
                           Spacer(modifier = Modifier.height(6.dp))
                           Row(modifier = Modifier.fillMaxWidth().glass(RoundedCornerShape(18.dp), 0.18f).padding(4.dp)) {
-                              listOf("Smooth", "Retro", "Full Blocky", "Custom").forEach { p ->
-                                  val act = preset == p
-                                  Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(if (act) PurpleNeon else Color.Transparent).clickable { preset = p; slider = when(p) { "Smooth" -> 1f; "Retro" -> 2f; "Full Blocky" -> 3f; else -> 4f } }.padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
-                                      Text(p, color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                              listOf("Smooth", "Retro", "Full Blocky", "Custom").forEach { item ->
+                                  val selected = preset == item
+                                  Box(
+                                      modifier = Modifier.weight(1f).clip(RoundedCornerShape(14.dp))
+                                          .background(if (selected) PurpleNeon else Color.Transparent)
+                                          .clickable {
+                                              preset = item
+                                              slider = when (item) {
+                                                  "Smooth" -> 1f
+                                                  "Retro" -> 2f
+                                                  "Full Blocky" -> 3f
+                                                  else -> 4f
+                                              }
+                                          }
+                                          .padding(vertical = 8.dp),
+                                      contentAlignment = Alignment.Center
+                                  ) {
+                                      Text(item, color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                   }
                               }
                           }
+
                           Spacer(modifier = Modifier.height(12.dp))
                           Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                              Text("Texture Detail (Semakin Tinggi = Pecah)", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                              Text("Texture Detail", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                               Text(labels[slider.toInt().coerceIn(0, 4)], color = Lavender, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
                           }
-                          Slider(value = slider, onValueChange = { slider = it; preset = "Custom" }, valueRange = 0f..4f, steps = 3, colors = SliderDefaults.colors(thumbColor = WhiteG, activeTrackColor = PurpleNeon))
+                          Slider(
+                              value = slider,
+                              onValueChange = {
+                                  slider = it
+                                  preset = "Custom"
+                              },
+                              valueRange = 0f..4f,
+                              steps = 3,
+                              colors = SliderDefaults.colors(thumbColor = WhiteG, activeTrackColor = PurpleNeon)
+                          )
+
                           Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                              Row(modifier = Modifier.weight(1f).glass(RoundedCornerShape(16.dp), 0.18f).padding(10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                              Row(
+                                  modifier = Modifier.weight(1f).glass(RoundedCornerShape(16.dp), 0.18f).padding(10.dp),
+                                  horizontalArrangement = Arrangement.SpaceBetween,
+                                  verticalAlignment = Alignment.CenterVertically
+                              ) {
                                   Text("Sharp Pixels", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                   Switch(checked = sharp, onCheckedChange = { sharp = it }, colors = SwitchDefaults.colors(checkedTrackColor = PurpleNeon))
                               }
-                              Row(modifier = Modifier.weight(1f).glass(RoundedCornerShape(16.dp), 0.18f).padding(10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                              Row(
+                                  modifier = Modifier.weight(1f).glass(RoundedCornerShape(16.dp), 0.18f).padding(10.dp),
+                                  horizontalArrangement = Arrangement.SpaceBetween,
+                                  verticalAlignment = Alignment.CenterVertically
+                              ) {
                                   Text("Hard Steps", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                   Switch(checked = hard, onCheckedChange = { hard = it }, colors = SwitchDefaults.colors(checkedTrackColor = PurpleNeon))
                               }
                           }
                       }
+
                       Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                          Box(modifier = Modifier.weight(0.9f).height(46.dp).glass(RoundedCornerShape(16.dp), 0.16f).clickable { onApply("Original", 1.0f, false, false) }, contentAlignment = Alignment.Center) {
+                          Box(
+                              modifier = Modifier.weight(0.9f).height(46.dp).glass(RoundedCornerShape(16.dp), 0.16f)
+                                  .clickable { onApply("Original", 1.0f, false, false) },
+                              contentAlignment = Alignment.Center
+                          ) {
                               Text("Reset", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                           }
-                          Box(modifier = Modifier.weight(1.3f).height(46.dp).clip(RoundedCornerShape(16.dp)).background(Brush.horizontalGradient(listOf(PurpleNeon, Lavender))).clickable {
-                              val scale = when(slider.toInt()) { 0 -> 1.0f; 1 -> 0.7f; 2 -> 0.5f; 3 -> 0.35f; else -> 0.2f }
-                              onApply(preset, scale, sharp, hard)
-                          }, contentAlignment = Alignment.Center) {
+                          Box(
+                              modifier = Modifier.weight(1.3f).height(46.dp).clip(RoundedCornerShape(16.dp))
+                                  .background(Brush.horizontalGradient(listOf(PurpleNeon, Lavender)))
+                                  .clickable {
+                                      val scale = when (slider.toInt()) {
+                                          0 -> 1.0f
+                                          1 -> 0.7f
+                                          2 -> 0.5f
+                                          3 -> 0.35f
+                                          else -> 0.2f
+                                      }
+                                      onApply(preset, scale, sharp, hard)
+                                  },
+                              contentAlignment = Alignment.Center
+                          ) {
                               Text("Save", color = BlackBg, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
                           }
                       }
@@ -527,91 +960,166 @@ jobs:
           }
 
           @Composable
-          fun AdvScr(ok: Boolean, onBack: () -> Unit, onApplyAdv: (Int, String, Boolean, String, String, Boolean, String) -> Unit) {
-              var res by remember { mutableFloatStateOf(100f) }
+          private fun AdvScr(
+              shizukuOk: Boolean,
+              onBack: () -> Unit,
+              onApplyAdvanced: (Int, String, Boolean, String, String, Boolean, String) -> Unit
+          ) {
+              var resolution by remember { mutableFloatStateOf(100f) }
               var fps by remember { mutableStateOf("Max") }
               var msaa by remember { mutableStateOf(false) }
-              var drv by remember { mutableStateOf("Game Driver") }
+              var driver by remember { mutableStateOf("Game Driver") }
               var mode by remember { mutableStateOf("Performance") }
               var fixed by remember { mutableStateOf(true) }
-              var anim by remember { mutableStateOf("Normal") }
+              var animation by remember { mutableStateOf("Normal") }
 
-              Row(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                  Column(modifier = Modifier.weight(1.3f).fillMaxHeight().glass(RoundedCornerShape(24.dp), 0.18f).padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+              Row(
+                  modifier = Modifier.fillMaxSize().padding(16.dp),
+                  horizontalArrangement = Arrangement.spacedBy(16.dp)
+              ) {
+                  Column(
+                      modifier = Modifier.weight(1.3f).fillMaxHeight()
+                          .glass(RoundedCornerShape(24.dp), 0.18f).padding(16.dp)
+                          .verticalScroll(rememberScrollState()),
+                      verticalArrangement = Arrangement.spacedBy(16.dp)
+                  ) {
                       Row(verticalAlignment = Alignment.CenterVertically) {
-                          Box(modifier = Modifier.size(36.dp).glass(CircleShape, 0.25f).clickable { onBack() }, contentAlignment = Alignment.Center) { Icon(Icons.Default.ArrowBack, contentDescription = null, tint = WhiteG) }
+                          Box(modifier = Modifier.size(36.dp).glass(CircleShape, 0.25f).clickable { onBack() }, contentAlignment = Alignment.Center) {
+                              Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = WhiteG)
+                          }
                           Spacer(modifier = Modifier.width(10.dp))
                           Text("GRAPHICS & PERFORMANCE", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                       }
+
                       Column {
                           Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                               Text("Game resolution", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                              Text("${res.roundToInt()}%", color = Lavender, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                              Text("${resolution.roundToInt()}%", color = Lavender, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                           }
-                          Slider(value = res, onValueChange = { res = it }, valueRange = 30f..100f, steps = 7, colors = SliderDefaults.colors(activeTrackColor = PurpleNeon))
+                          Slider(
+                              value = resolution,
+                              onValueChange = { resolution = it },
+                              valueRange = 30f..100f,
+                              steps = 7,
+                              colors = SliderDefaults.colors(activeTrackColor = PurpleNeon)
+                          )
                       }
+
                       Column {
-                          Text("FPS limit", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                          Text("FPS limit (pilihan UI)", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                           Spacer(modifier = Modifier.height(6.dp))
                           Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                              listOf("30", "60", "90", "120", "Max").forEach { f ->
-                                  val act = fps == f
-                                  Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(if (act) PurpleNeon else WhiteG.copy(0.1f)).clickable { fps = f }.padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
-                                      Text(f, color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                              listOf("30", "60", "90", "120", "Max").forEach { value ->
+                                  val selected = fps == value
+                                  Box(
+                                      modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                                          .background(if (selected) PurpleNeon else WhiteG.copy(alpha = 0.1f))
+                                          .clickable { fps = value }.padding(vertical = 8.dp),
+                                      contentAlignment = Alignment.Center
+                                  ) {
+                                      Text(value, color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                   }
                               }
                           }
                       }
-                      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                          Text("Anti-aliasing 4x MSAA", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+
+                      Row(
+                          modifier = Modifier.fillMaxWidth(),
+                          horizontalArrangement = Arrangement.SpaceBetween,
+                          verticalAlignment = Alignment.CenterVertically
+                      ) {
+                          Text("Anti-aliasing 4x MSAA (pilihan UI)", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                           Switch(checked = msaa, onCheckedChange = { msaa = it }, colors = SwitchDefaults.colors(checkedTrackColor = PurpleNeon))
                       }
+
                       Column {
                           Text("Graphics driver", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                           Spacer(modifier = Modifier.height(6.dp))
                           Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                              listOf("Default SYSTEM", "Game Driver", "Vulkan Experimental").forEach { d ->
-                                  val act = drv == d
-                                  Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(if (act) PurpleNeon else WhiteG.copy(0.1f)).clickable { drv = d }.padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
-                                      Text(d, color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                              listOf("Default SYSTEM", "Game Driver", "Vulkan Experimental").forEach { value ->
+                                  val selected = driver == value
+                                  Box(
+                                      modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                                          .background(if (selected) PurpleNeon else WhiteG.copy(alpha = 0.1f))
+                                          .clickable { driver = value }.padding(vertical = 8.dp),
+                                      contentAlignment = Alignment.Center
+                                  ) {
+                                      Text(value, color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 9.sp)
                                   }
                               }
                           }
                       }
                   }
-                  Column(modifier = Modifier.weight(1.1f).fillMaxHeight().glass(RoundedCornerShape(24.dp), 0.18f).padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
+
+                  Column(
+                      modifier = Modifier.weight(1.1f).fillMaxHeight()
+                          .glass(RoundedCornerShape(24.dp), 0.18f).padding(16.dp),
+                      verticalArrangement = Arrangement.SpaceBetween
+                  ) {
                       Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                           Text("PERFORMANCE", color = Lavender, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                           Column {
                               Text("Game Mode", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                               Spacer(modifier = Modifier.height(4.dp))
                               Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                  listOf("Standard", "Performance", "Saver").forEach { md ->
-                                      val act = mode == md
-                                      Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(if (act) PurpleNeon else WhiteG.copy(0.1f)).clickable { mode = md }.padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
-                                          Text(md, color = WhiteG, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                  listOf("Standard", "Performance", "Saver").forEach { value ->
+                                      val selected = mode == value
+                                      Box(
+                                          modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                                              .background(if (selected) PurpleNeon else WhiteG.copy(alpha = 0.1f))
+                                              .clickable { mode = value }.padding(vertical = 6.dp),
+                                          contentAlignment = Alignment.Center
+                                      ) {
+                                          Text(value, color = WhiteG, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                       }
                                   }
                               }
                           }
-                          Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                              Text("Fixed performance mode", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+
+                          Row(
+                              modifier = Modifier.fillMaxWidth(),
+                              horizontalArrangement = Arrangement.SpaceBetween,
+                              verticalAlignment = Alignment.CenterVertically
+                          ) {
+                              Text("Fixed performance mode", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                               Switch(checked = fixed, onCheckedChange = { fixed = it }, colors = SwitchDefaults.colors(checkedTrackColor = PurpleNeon))
                           }
+
                           Column {
                               Text("System animation", color = WhiteG, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                               Spacer(modifier = Modifier.height(4.dp))
                               Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                  listOf("Normal", "Fast", "Off").forEach { a ->
-                                      val act = anim == a
-                                      Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(if (act) PurpleNeon else WhiteG.copy(0.1f)).clickable { anim = a }.padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
-                                          Text(a, color = WhiteG, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                  listOf("Normal", "Fast", "Off").forEach { value ->
+                                      val selected = animation == value
+                                      Box(
+                                          modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                                              .background(if (selected) PurpleNeon else WhiteG.copy(alpha = 0.1f))
+                                              .clickable { animation = value }.padding(vertical = 6.dp),
+                                          contentAlignment = Alignment.Center
+                                      ) {
+                                          Text(value, color = WhiteG, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                       }
                                   }
                               }
                           }
                       }
-                      Box(modifier = Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(14.dp)).background(Brush.horizontalGradient(listOf(PurpleNeon, Lavender))).clickable { onApplyAdv(res.roundToInt(), fps, msaa, drv, mode, fixed, anim) }, contentAlignment = Alignment.Center) {
+
+                      Box(
+                          modifier = Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(14.dp))
+                              .background(Brush.horizontalGradient(listOf(PurpleNeon, Lavender)))
+                              .clickable {
+                                  onApplyAdvanced(
+                                      resolution.roundToInt(),
+                                      fps,
+                                      msaa,
+                                      driver,
+                                      mode,
+                                      fixed,
+                                      animation
+                                  )
+                              },
+                          contentAlignment = Alignment.Center
+                      ) {
                           Text("Apply Advanced", color = BlackBg, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
                       }
                   }
@@ -619,11 +1127,13 @@ jobs:
           }
           EOF
 
-      - name: Bina APK Menggunakan Gradle CLI
-        run: gradle assembleDebug
+      - name: Bina APK Menggunakan Gradle
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
 
       - name: Muat Naik Fail APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Zayon-GameSpace-Final-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
