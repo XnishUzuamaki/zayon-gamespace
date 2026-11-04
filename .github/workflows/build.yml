@@ -1,4 +1,4 @@
-name: Auto Build Zayon APK
+name: Auto Build Zayon APK v2
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
         with:
           gradle-version: '8.5'
 
-      - name: Jana Semua Fail Projek Secara Automatik
+      - name: Jana Struktur Projek & Konfigurasi
         run: |
           mkdir -p app/src/main/java/com/xnish/gamespace
 
@@ -73,8 +73,8 @@ jobs:
                   applicationId = "com.xnish.gamespace"
                   minSdk = 26
                   targetSdk = 34
-                  versionCode = 1
-                  versionName = "1.0.5"
+                  versionCode = 2
+                  versionName = "1.0.6"
               }
 
               buildFeatures { compose = true }
@@ -102,6 +102,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+              <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
               <application
                   android:allowBackup="true"
                   android:label="Zayon Liquid Glass"
@@ -127,11 +128,12 @@ jobs:
           </manifest>
           EOF
 
-      - name: Masukkan Kod MainActivity.kt
+      - name: Masukkan Kod Lengkap MainActivity.kt (3 Skrin + ANGLE Driver)
         run: |
           cat << 'EOF' > app/src/main/java/com/xnish/gamespace/MainActivity.kt
           package com.xnish.gamespace
 
+          import android.content.Intent
           import android.content.pm.ActivityInfo
           import android.content.pm.PackageManager
           import android.os.Bundle
@@ -160,7 +162,6 @@ jobs:
           import androidx.compose.ui.graphics.Color
           import androidx.compose.ui.graphics.Shape
           import androidx.compose.ui.input.pointer.pointerInput
-          import androidx.compose.ui.platform.LocalContext
           import androidx.compose.ui.text.font.FontWeight
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
@@ -168,6 +169,7 @@ jobs:
           import java.io.BufferedReader
           import java.io.InputStreamReader
 
+          // Tema Warna iOS 27 Purple Liquid Glass
           val DeepSpaceBlack = Color(0xFF07030F)
           val NeonPurple = Color(0xFFB845FF)
           val ElectricViolet = Color(0xFF7B2CBF)
@@ -176,6 +178,15 @@ jobs:
 
           class MainActivity : ComponentActivity(), Shizuku.OnRequestPermissionResultListener {
               private var shizukuGranted by mutableStateOf(false)
+              private var activePresetName by mutableStateOf("FULL BLOCKY")
+
+              // Senarai pakej semua game utama supaya ANGLE driver & grafik Very Low berjalan menyeluruh
+              private val targetGames = listOf(
+                  "com.dts.freefiremax",
+                  "com.dts.freefireth",
+                  "com.mobile.legends",
+                  "com.roblox.client"
+              )
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
@@ -183,7 +194,9 @@ jobs:
                   checkShizukuPermission()
 
                   setContent {
+                      // 3 Skrin: HOME (Gambar 2) -> SELECT_GAME (Gambar 4) -> LIGHT_TEXTURE (Gambar 1)
                       var currentScreen by remember { mutableStateOf("HOME") }
+
                       LaunchedEffect(currentScreen) {
                           requestedOrientation = if (currentScreen == "HOME") {
                               ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -191,23 +204,42 @@ jobs:
                               ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                           }
                       }
+
                       LiquidGlassBackground {
-                          if (currentScreen == "HOME") {
-                              HomeScreen(
+                          when (currentScreen) {
+                              "HOME" -> HomeScreen(
                                   shizukuReady = shizukuGranted,
                                   onRequestShizuku = { requestShizuku() },
-                                  onEnterGameSpace = { currentScreen = "GRAPHICS" }
+                                  onEnterGameSpace = { currentScreen = "SELECT_GAME" },
+                                  onLaunchGame = { launchGame("com.dts.freefiremax") }
                               )
-                          } else {
-                              GraphicsConfigScreen(
+                              "SELECT_GAME" -> SelectGameSpaceScreen(
+                                  currentMode = activePresetName,
+                                  onBackHome = { currentScreen = "HOME" },
+                                  onOpenLightTexture = { currentScreen = "LIGHT_TEXTURE" },
+                                  onLaunchGame = { launchGame("com.dts.freefiremax") }
+                              )
+                              "LIGHT_TEXTURE" -> GraphicsConfigScreen(
                                   shizukuReady = shizukuGranted,
-                                  onBack = { currentScreen = "HOME" },
-                                  onApplyGraphics = { detailLevel, sharpPixels, hardSteps, enabled ->
-                                      applyShizukuGraphics(detailLevel, sharpPixels, hardSteps, enabled)
+                                  onBack = { currentScreen = "SELECT_GAME" },
+                                  onApplyGraphics = { preset, detailLevel, sharpPixels, hardSteps, enabled ->
+                                      activePresetName = preset.uppercase()
+                                      applyAngleVeryLowGraphics(detailLevel, sharpPixels, hardSteps, enabled)
                                   }
                               )
                           }
                       }
+                  }
+              }
+
+              private fun launchGame(pkg: String) {
+                  val launchIntent: Intent? = packageManager.getLaunchIntentForPackage(pkg)
+                      ?: packageManager.getLaunchIntentForPackage("com.dts.freefireth")
+                  if (launchIntent != null) {
+                      launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                      startActivity(launchIntent)
+                  } else {
+                      Toast.makeText(this, "Game Free Fire MAX belum dipasang di peranti ini!", Toast.LENGTH_SHORT).show()
                   }
               }
 
@@ -222,14 +254,14 @@ jobs:
               private fun requestShizuku() {
                   try {
                       if (!Shizuku.pingBinder()) {
-                          Toast.makeText(this, "Sila hidupkan servis Shizuku dahulu!", Toast.LENGTH_SHORT).show()
+                          Toast.makeText(this, "Sila hidupkan aplikasi Shizuku dahulu!", Toast.LENGTH_SHORT).show()
                           return
                       }
                       if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
                           Shizuku.requestPermission(1001)
                       } else {
                           shizukuGranted = true
-                          Toast.makeText(this, "Akses Shizuku Aktif!", Toast.LENGTH_SHORT).show()
+                          Toast.makeText(this, "Shizuku Aktif & Bersedia!", Toast.LENGTH_SHORT).show()
                       }
                   } catch (e: Exception) {
                       Toast.makeText(this, "Ralat Shizuku: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -240,43 +272,99 @@ jobs:
                   shizukuGranted = grantResult == PackageManager.PERMISSION_GRANTED
               }
 
-              private fun applyShizukuGraphics(detailIndex: Int, sharpPixels: Boolean, hardSteps: Boolean, ffMaxEnabled: Boolean) {
+              // SISTEM GRAFIK BAHARU: Set Graphics Every Game to Very Low Using ANGLE Driver
+              private fun applyAngleVeryLowGraphics(
+                  detailIndex: Int,
+                  sharpPixels: Boolean,
+                  hardSteps: Boolean,
+                  enabled: Boolean
+              ) {
                   if (!shizukuGranted) {
                       requestShizuku()
                       return
                   }
-                  val pkg = "com.dts.freefiremax"
-                  if (!ffMaxEnabled) {
-                      runShizukuShell("cmd game mode standard $pkg")
-                      Toast.makeText(this, "Reset ke grafik asal berjaya.", Toast.LENGTH_SHORT).show()
+
+                  if (!enabled) {
+                      val resetCmds = mutableListOf(
+                          "settings delete global angle_gl_driver_all_angle",
+                          "settings delete global angle_gl_driver_selection_pkgs",
+                          "settings delete global angle_gl_driver_selection_values",
+                          "settings delete global updatable_driver_all_apps"
+                      )
+                      targetGames.forEach { pkg ->
+                          resetCmds.add("cmd game reset $pkg")
+                          resetCmds.add("device_config delete game_overlay $pkg")
+                      }
+                      runShizukuBatch(resetCmds)
+                      Toast.makeText(this, "Semua grafik game dikembalikan ke asal (Original).", Toast.LENGTH_SHORT).show()
                       return
                   }
-                  val downscaleRatio = when (detailIndex) {
-                      0 -> "1.0"
-                      1 -> "0.85"
-                      2 -> "0.70"
-                      3 -> "0.55"
-                      else -> "0.40"
+
+                  // Skala Very Low mengikut tahap slider (Extreme = 0.35 / Very Low)
+                  val scale = when (detailIndex) {
+                      0 -> "0.85"
+                      1 -> "0.70"
+                      2 -> "0.55"
+                      3 -> "0.45"
+                      else -> "0.35" // Very Low / Extreme Light Texture
                   }
-                  val commands = mutableListOf(
-                      "cmd game mode custom $pkg",
-                      "device_config put game_overlay $pkg mode=2,downscaleFactor=$downscaleRatio:mode=3,downscaleFactor=$downscaleRatio",
-                      "setprop debug.hwui.renderer skiagl",
-                      if (sharpPixels) "setprop debug.hwui.filter_quality nearest" else "setprop debug.hwui.filter_quality linear"
+
+                  val pkgsString = targetGames.joinToString(",")
+                  val angleValues = targetGames.joinToString(",") { "angle" }
+
+                  val cmds = mutableListOf(
+                      // 1. Paksa ANGLE Driver untuk semua pakej game & sistem OpenGL
+                      "settings put global angle_gl_driver_all_angle 1",
+                      "settings put global angle_gl_driver_selection_pkgs $pkgsString",
+                      "settings put global angle_gl_driver_selection_values $angleValues",
+                      "settings put global updatable_driver_all_apps 2",
+                      "settings put global updatable_driver_production_opt_in_apps $pkgsString",
+
+                      // 2. Paksa tekstur & penapisan GPU ke tahap Very Low / Nearest Pixel
+                      "setprop debug.hwui.renderer skiavk",
+                      "setprop debug.angle.overlay FPS:Vulkan",
+                      if (sharpPixels) "setprop debug.hwui.filter_quality nearest" else "setprop debug.hwui.filter_quality low",
+                      if (hardSteps) "setprop debug.egl.force_msaa 0" else "setprop debug.egl.force_msaa false",
+                      "setprop debug.egl.swapinterval 0"
                   )
-                  if (hardSteps) commands.add("setprop debug.egl.force_msaa false")
-                  val success = commands.all { runShizukuShell(it) }
-                  Toast.makeText(this, if (success) "Grafik Light Texture ($downscaleRatio) diaktifkan!" else "Gagal jalankan Shizuku.", Toast.LENGTH_LONG).show()
+
+                  // 3. Terapkan Downscale Very Low ke setiap game & restart proses game supaya terus berkesan
+                  targetGames.forEach { pkg ->
+                      cmds.add("device_config put game_overlay $pkg mode=2,angle=true,downscaleFactor=$scale,fps=120:mode=3,angle=true,downscaleFactor=$scale,fps=120")
+                      cmds.add("cmd game mode 2 $pkg")
+                      cmds.add("cmd game downscale $scale $pkg")
+                      cmds.add("am force-stop $pkg")
+                  }
+
+                  val ok = runShizukuBatch(cmds)
+                  if (ok) {
+                      Toast.makeText(
+                          this,
+                          "Berjaya! ANGLE Driver + Grafik Very Low ($scale) diaktifkan untuk semua game!",
+                          Toast.LENGTH_LONG
+                      ).show()
+                  } else {
+                      Toast.makeText(this, "Gagal menjalankan arahan Shizuku. Pastikan Shizuku aktif.", Toast.LENGTH_SHORT).show()
+                  }
               }
 
-              private fun runShizukuShell(cmd: String): Boolean {
+              private fun runShizukuBatch(commands: List<String>): Boolean {
                   return try {
-                      val method = Shizuku::class.java.getDeclaredMethod("newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java)
+                      val fullCommand = commands.joinToString(" ; ")
+                      val method = Shizuku::class.java.getDeclaredMethod(
+                          "newProcess",
+                          Array<String>::class.java,
+                          Array<String>::class.java,
+                          String::class.java
+                      )
                       method.isAccessible = true
-                      val process = method.invoke(null, arrayOf("sh", "-c", cmd), null, null) as Process
+                      val process = method.invoke(null, arrayOf("sh", "-c", fullCommand), null, null) as Process
                       BufferedReader(InputStreamReader(process.inputStream)).readText()
-                      process.waitFor() == 0
-                  } catch (e: Exception) { false }
+                      process.waitFor()
+                      true
+                  } catch (e: Exception) {
+                      false
+                  }
               }
 
               override fun onDestroy() {
@@ -290,10 +378,10 @@ jobs:
               Box(modifier = Modifier.fillMaxSize().background(DeepSpaceBlack)) {
                   Canvas(modifier = Modifier.fillMaxSize()) {
                       drawCircle(
-                          brush = Brush.radialGradient(listOf(NeonPurple.copy(0.28f), Color.Transparent), center = Offset(size.width * 0.2f, size.height * 0.2f), radius = size.minDimension * 0.7f)
+                          brush = Brush.radialGradient(listOf(NeonPurple.copy(0.30f), Color.Transparent), center = Offset(size.width * 0.2f, size.height * 0.2f), radius = size.minDimension * 0.75f)
                       )
                       drawCircle(
-                          brush = Brush.radialGradient(listOf(ElectricViolet.copy(0.25f), Color.Transparent), center = Offset(size.width * 0.85f, size.height * 0.75f), radius = size.minDimension * 0.8f)
+                          brush = Brush.radialGradient(listOf(ElectricViolet.copy(0.28f), Color.Transparent), center = Offset(size.width * 0.85f, size.height * 0.75f), radius = size.minDimension * 0.85f)
                       )
                   }
                   content()
@@ -301,14 +389,19 @@ jobs:
           }
 
           @Composable
-          fun Modifier.ios27LiquidGlass(shape: Shape = RoundedCornerShape(26.dp), tintOpacity: Float = 0.16f): Modifier = this
+          fun Modifier.ios27LiquidGlass(shape: Shape = RoundedCornerShape(24.dp), tintOpacity: Float = 0.18f): Modifier = this
               .clip(shape)
-              .background(Brush.linearGradient(listOf(GlassWhite.copy(0.14f), NeonPurple.copy(tintOpacity), ElectricViolet.copy(0.08f))))
-              .border(1.2.dp, Brush.linearGradient(listOf(GlassWhite.copy(0.55f), LiquidLavender.copy(0.35f), NeonPurple.copy(0.15f))), shape)
+              .background(Brush.linearGradient(listOf(GlassWhite.copy(0.15f), NeonPurple.copy(tintOpacity), ElectricViolet.copy(0.10f))))
+              .border(1.2.dp, Brush.linearGradient(listOf(GlassWhite.copy(0.55f), LiquidLavender.copy(0.38f), NeonPurple.copy(0.18f))), shape)
 
+          // ================= SKRIN 1: HOME (GAMBAR 2) =================
           @Composable
-          fun HomeScreen(shizukuReady: Boolean, onRequestShizuku: () -> Unit, onEnterGameSpace: () -> Unit) {
-              val context = LocalContext.current
+          fun HomeScreen(
+              shizukuReady: Boolean,
+              onRequestShizuku: () -> Unit,
+              onEnterGameSpace: () -> Unit,
+              onLaunchGame: () -> Unit
+          ) {
               Box(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp)) {
                   Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 90.dp)) {
                       Spacer(modifier = Modifier.height(12.dp))
@@ -320,25 +413,25 @@ jobs:
                                   Text("0B6433DC", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                               }
                               Spacer(modifier = Modifier.width(12.dp))
-                              Box(modifier = Modifier.size(44.dp).ios27LiquidGlass(CircleShape, 0.25f).clickable { onRequestShizuku() }, contentAlignment = Alignment.Center) {
+                              Box(modifier = Modifier.size(44.dp).ios27LiquidGlass(CircleShape, 0.28f).clickable { onRequestShizuku() }, contentAlignment = Alignment.Center) {
                                   Icon(if (shizukuReady) Icons.Default.VerifiedUser else Icons.Default.PersonOutline, contentDescription = null, tint = if (shizukuReady) NeonPurple else Color.White)
                               }
                           }
                       }
                       Spacer(modifier = Modifier.height(26.dp))
                       Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                          Box(modifier = Modifier.size(110.dp).ios27LiquidGlass(CircleShape, 0.35f), contentAlignment = Alignment.Center) {
-                              Text("Z", color = LiquidLavender, fontSize = 52.sp, fontWeight = FontWeight.Black)
+                          Box(modifier = Modifier.size(105.dp).ios27LiquidGlass(CircleShape, 0.35f), contentAlignment = Alignment.Center) {
+                              Text("Z", color = LiquidLavender, fontSize = 50.sp, fontWeight = FontWeight.Black)
                           }
-                          Spacer(modifier = Modifier.width(22.dp))
+                          Spacer(modifier = Modifier.width(20.dp))
                           Column {
                               Text("TOUCH OPTIMIZE", color = LiquidLavender.copy(0.75f), fontSize = 12.sp, letterSpacing = 3.sp)
                               Text("ZAYON", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp)
-                              Text(if (shizukuReady) "v1.0.5 • Shizuku Aktif" else "v1.0.5 • Klik untuk Shizuku", color = LiquidLavender, fontSize = 12.sp, modifier = Modifier.clickable { onRequestShizuku() })
+                              Text(if (shizukuReady) "v1.0.6 • Shizuku ANGLE Aktif" else "v1.0.6 • Klik Ikon Atas Aktifkan Shizuku", color = LiquidLavender, fontSize = 11.sp, modifier = Modifier.clickable { onRequestShizuku() })
                           }
                       }
                       Spacer(modifier = Modifier.height(28.dp))
-                      Column(modifier = Modifier.fillMaxWidth().ios27LiquidGlass(RoundedCornerShape(28.dp), 0.22f).clickable { onEnterGameSpace() }.padding(20.dp)) {
+                      Column(modifier = Modifier.fillMaxWidth().ios27LiquidGlass(RoundedCornerShape(28.dp), 0.24f).clickable { onEnterGameSpace() }.padding(20.dp)) {
                           Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                               Row(verticalAlignment = Alignment.CenterVertically) {
                                   Box(modifier = Modifier.size(54.dp).ios27LiquidGlass(RoundedCornerShape(16.dp), 0.3f), contentAlignment = Alignment.Center) {
@@ -356,9 +449,9 @@ jobs:
                           }
                           Spacer(modifier = Modifier.height(16.dp))
                           Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                              Text("Token  30 / 300", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                              Text("Token  35 / 300", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                               Spacer(modifier = Modifier.width(12.dp))
-                              LinearProgressIndicator(progress = 0.15f, modifier = Modifier.weight(1f).height(6.dp).clip(CircleShape), color = NeonPurple, trackColor = Color.White.copy(0.12f))
+                              LinearProgressIndicator(progress = 0.18f, modifier = Modifier.weight(1f).height(6.dp).clip(CircleShape), color = NeonPurple, trackColor = Color.White.copy(0.12f))
                           }
                       }
                       Spacer(modifier = Modifier.height(26.dp))
@@ -375,13 +468,10 @@ jobs:
                                   Column {
                                       Text("LAST PLAYED", color = LiquidLavender.copy(0.7f), fontSize = 11.sp)
                                       Text("Free Fire MAX", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
-                                      Text("⏱ 0m", color = Color.White.copy(0.65f), fontSize = 13.sp)
+                                      Text("⏱ 1m", color = Color.White.copy(0.65f), fontSize = 13.sp)
                                   }
                                   Button(
-                                      onClick = {
-                                          val intent = context.packageManager.getLaunchIntentForPackage("com.dts.freefiremax")
-                                          if (intent != null) context.startActivity(intent) else onEnterGameSpace()
-                                      },
+                                      onClick = { onLaunchGame() },
                                       colors = ButtonDefaults.buttonColors(containerColor = NeonPurple),
                                       shape = CircleShape
                                   ) {
@@ -396,25 +486,214 @@ jobs:
                           }
                       }
                   }
-                  Row(modifier = Modifier.align(Alignment.BottomCenter).ios27LiquidGlass(CircleShape, 0.28f).padding(horizontal = 18.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                      IconButton(onClick = { onEnterGameSpace() }) { Icon(Icons.Default.GridView, contentDescription = null, tint = Color.White.copy(0.7f)) }
-                      Row(modifier = Modifier.clip(CircleShape).background(NeonPurple.copy(0.45f)).padding(horizontal = 18.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                          Icon(Icons.Default.Home, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                          Spacer(modifier = Modifier.width(6.dp))
-                          Text("Home", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+              }
+          }
+
+          // ================= SKRIN 2: SELECT GAME SPACE (GAMBAR 4 TERBARU) =================
+          @Composable
+          fun SelectGameSpaceScreen(
+              currentMode: String,
+              onBackHome: () -> Unit,
+              onOpenLightTexture: () -> Unit,
+              onLaunchGame: () -> Unit
+          ) {
+              Row(modifier = Modifier.fillMaxSize()) {
+                  // Sidebar Kiri (Z Logo, Gamepad Aktif, Speedometer, Battery, Tune, Power/Home)
+                  Column(
+                      modifier = Modifier
+                          .width(74.dp)
+                          .fillMaxHeight()
+                          .background(Color.Black.copy(alpha = 0.35f))
+                          .padding(vertical = 18.dp),
+                      horizontalAlignment = Alignment.CenterHorizontally,
+                      verticalArrangement = Arrangement.SpaceBetween
+                  ) {
+                      // Logo Z Bulat
+                      Box(
+                          modifier = Modifier.size(46.dp).ios27LiquidGlass(CircleShape, 0.35f),
+                          contentAlignment = Alignment.Center
+                      ) {
+                          Text("Z", color = LiquidLavender, fontWeight = FontWeight.Black, fontSize = 22.sp)
                       }
-                      IconButton(onClick = { onEnterGameSpace() }) { Icon(Icons.Default.TouchApp, contentDescription = null, tint = Color.White.copy(0.7f)) }
+
+                      // Ikon Navigasi Tengah
+                      Column(
+                          horizontalAlignment = Alignment.CenterHorizontally,
+                          verticalArrangement = Arrangement.spacedBy(20.dp)
+                      ) {
+                          Row(verticalAlignment = Alignment.CenterVertically) {
+                              Box(modifier = Modifier.width(4.dp).height(26.dp).clip(CircleShape).background(LiquidLavender))
+                              Spacer(modifier = Modifier.width(6.dp))
+                              Box(
+                                  modifier = Modifier.size(44.dp).ios27LiquidGlass(RoundedCornerShape(14.dp), 0.35f),
+                                  contentAlignment = Alignment.Center
+                              ) {
+                                  Icon(Icons.Default.SportsEsports, contentDescription = null, tint = LiquidLavender)
+                              }
+                          }
+                          Icon(Icons.Default.Speed, contentDescription = null, tint = Color.White.copy(0.45f))
+                          Icon(Icons.Default.BatteryChargingFull, contentDescription = null, tint = Color.White.copy(0.45f))
+                          Icon(Icons.Default.Tune, contentDescription = null, tint = Color.White.copy(0.45f), modifier = Modifier.clickable { onOpenLightTexture() })
+                      }
+
+                      // Butang Power / Kembali ke Home
+                      Box(
+                          modifier = Modifier.size(44.dp).ios27LiquidGlass(CircleShape, 0.2f).clickable { onBackHome() },
+                          contentAlignment = Alignment.Center
+                      ) {
+                          Icon(Icons.Default.PowerSettingsNew, contentDescription = "Back Home", tint = Color.White.copy(0.8f))
+                      }
+                  }
+
+                  // Kandungan Utama Select Game
+                  Column(
+                      modifier = Modifier
+                          .weight(1f)
+                          .fillMaxHeight()
+                          .padding(horizontal = 24.dp, vertical = 16.dp),
+                      verticalArrangement = Arrangement.SpaceBetween
+                  ) {
+                      // Bar Atas: Tajuk Select Game & Token + Jam
+                      Row(
+                          modifier = Modifier.fillMaxWidth(),
+                          horizontalArrangement = Arrangement.SpaceBetween,
+                          verticalAlignment = Alignment.CenterVertically
+                      ) {
+                          Column {
+                              Text("ZAYON GAME SPACE", color = LiquidLavender.copy(0.7f), fontSize = 11.sp, letterSpacing = 2.sp)
+                              Text("Select Game", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
+                          }
+                          Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                              Box(
+                                  modifier = Modifier.ios27LiquidGlass(CircleShape, 0.25f).padding(horizontal = 14.dp, vertical = 6.dp)
+                              ) {
+                                  Text("Z  35 / 300", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                              }
+                              Text("18:55", color = Color.White.copy(0.85f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                          }
+                      }
+
+                      // Kad Pilihan Game (Free Fire MAX + Badge MODE FULL BLOCKY)
+                      Box(
+                          modifier = Modifier
+                              .width(270.dp)
+                              .height(165.dp)
+                              .ios27LiquidGlass(RoundedCornerShape(24.dp), 0.32f)
+                              .padding(16.dp)
+                      ) {
+                          Column(
+                              modifier = Modifier.fillMaxSize(),
+                              verticalArrangement = Arrangement.SpaceBetween
+                          ) {
+                              // Badge MODE | FULL BLOCKY
+                              Box(
+                                  modifier = Modifier
+                                      .clip(RoundedCornerShape(10.dp))
+                                      .background(DeepSpaceBlack.copy(alpha = 0.75f))
+                                      .border(1.dp, LiquidLavender.copy(0.4f), RoundedCornerShape(10.dp))
+                                      .padding(horizontal = 10.dp, vertical = 4.dp)
+                              ) {
+                                  Text("MODE | $currentMode ❖", color = LiquidLavender, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                              }
+
+                              Row(
+                                  modifier = Modifier.fillMaxWidth(),
+                                  horizontalArrangement = Arrangement.SpaceBetween,
+                                  verticalAlignment = Alignment.Bottom
+                              ) {
+                                  Column {
+                                      Text("Free Fire MAX", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                                      Text("1m", color = Color.White.copy(0.7f), fontSize = 12.sp)
+                                  }
+                                  Box(
+                                      modifier = Modifier.size(30.dp).clip(CircleShape).background(LiquidLavender),
+                                      contentAlignment = Alignment.Center
+                                  ) {
+                                      Icon(Icons.Default.Check, contentDescription = null, tint = DeepSpaceBlack, modifier = Modifier.size(18.dp))
+                                  }
+                              }
+                          }
+                      }
+
+                      // Bar Bawah: Statistik + Butang Light Texture (Setting Grafik) + Butang Free... (Masuk Game)
+                      Row(
+                          modifier = Modifier
+                              .fillMaxWidth()
+                              .ios27LiquidGlass(RoundedCornerShape(24.dp), 0.22f)
+                              .padding(horizontal = 20.dp, vertical = 12.dp),
+                          verticalAlignment = Alignment.CenterVertically,
+                          horizontalArrangement = Arrangement.SpaceBetween
+                      ) {
+                          // Statistik Sistem
+                          Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+                              StatColumn("TEMP", "34.0°C", Color.White)
+                              StatColumn("CPU", "0.99 GHz", Color.White)
+                              StatColumn("PING", "62.2 ms", Color.White)
+                              StatColumn("PERFORMANCE", "118%", LiquidLavender)
+                              StatColumn("BATTERY", "63%", Color.White)
+                          }
+
+                          // 2 Butang Kanan: Light Texture & Free...
+                          Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                              // Butang 1: Light Texture (Untuk Buka Setting Grafik)
+                              Box(
+                                  modifier = Modifier
+                                      .height(44.dp)
+                                      .ios27LiquidGlass(RoundedCornerShape(16.dp), 0.28f)
+                                      .clickable { onOpenLightTexture() }
+                                      .padding(horizontal = 16.dp),
+                                  contentAlignment = Alignment.Center
+                              ) {
+                                  Row(verticalAlignment = Alignment.CenterVertically) {
+                                      Icon(Icons.Default.SettingsSuggest, contentDescription = null, tint = LiquidLavender, modifier = Modifier.size(18.dp))
+                                      Spacer(modifier = Modifier.width(8.dp))
+                                      Text("Light Texture", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                  }
+                              }
+
+                              // Butang 2: ▷ Free... (Untuk Terus Masuk ke Dalam Game)
+                              Box(
+                                  modifier = Modifier
+                                      .height(44.dp)
+                                      .clip(RoundedCornerShape(16.dp))
+                                      .background(Brush.horizontalGradient(listOf(LiquidLavender, NeonPurple)))
+                                      .clickable { onLaunchGame() }
+                                      .padding(horizontal = 20.dp),
+                                  contentAlignment = Alignment.Center
+                              ) {
+                                  Row(verticalAlignment = Alignment.CenterVertically) {
+                                      Icon(Icons.Default.PlayArrow, contentDescription = null, tint = DeepSpaceBlack, modifier = Modifier.size(20.dp))
+                                      Spacer(modifier = Modifier.width(6.dp))
+                                      Text("Free...", color = DeepSpaceBlack, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+                                  }
+                              }
+                          }
+                      }
                   }
               }
           }
 
           @Composable
-          fun GraphicsConfigScreen(shizukuReady: Boolean, onBack: () -> Unit, onApplyGraphics: (Int, Boolean, Boolean, Boolean) -> Unit) {
-              var selectedPreset by remember { mutableStateOf("Custom") }
+          fun StatColumn(label: String, value: String, valueColor: Color) {
+              Column {
+                  Text(label, color = Color.White.copy(0.5f), fontSize = 9.sp, letterSpacing = 1.sp)
+                  Spacer(modifier = Modifier.height(2.dp))
+                  Text(value, color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+              }
+          }
+
+          // ================= SKRIN 3: LIGHT TEXTURE GRAPHICS (GAMBAR 1 + ANGLE DRIVER) =================
+          @Composable
+          fun GraphicsConfigScreen(
+              shizukuReady: Boolean,
+              onBack: () -> Unit,
+              onApplyGraphics: (String, Int, Boolean, Boolean, Boolean) -> Unit
+          ) {
+              var selectedPreset by remember { mutableStateOf("Full Blocky") }
               var sliderValue by remember { mutableFloatStateOf(4f) }
               var sharpPixels by remember { mutableStateOf(true) }
               var hardDistanceSteps by remember { mutableStateOf(true) }
-              var enableFFMax by remember { mutableStateOf(true) }
+              var enableAllGames by remember { mutableStateOf(true) }
               var splitRatio by remember { mutableFloatStateOf(0.5f) }
               val detailLabels = listOf("Original", "Light", "Retro", "Blocky", "Extreme")
 
@@ -426,8 +705,8 @@ jobs:
                           }
                           Spacer(modifier = Modifier.width(12.dp))
                           Column {
-                              Text("ZAYON GAME SPACE", color = LiquidLavender.copy(0.7f), fontSize = 10.sp)
-                              Text("Light Texture", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                              Text("ZAYON GAME SPACE • ANGLE DRIVER", color = LiquidLavender.copy(0.7f), fontSize = 10.sp)
+                              Text("Light Texture (Very Low)", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
                           }
                       }
                       Box(
@@ -441,14 +720,14 @@ jobs:
                               drawLine(color = Color.White, start = Offset(splitX, 0f), end = Offset(splitX, size.height), strokeWidth = 4f)
                           }
                           Text("BEFORE", color = Color.White, fontSize = 10.sp, modifier = Modifier.padding(12.dp).align(Alignment.TopStart))
-                          Text("AFTER", color = Color.White, fontSize = 10.sp, modifier = Modifier.padding(12.dp).align(Alignment.TopEnd))
+                          Text("AFTER (ANGLE VERY LOW)", color = LiquidLavender, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(12.dp).align(Alignment.TopEnd))
                       }
                       Row(modifier = Modifier.fillMaxWidth().ios27LiquidGlass(RoundedCornerShape(20.dp), 0.22f).padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                           Column {
-                              Text("Free Fire MAX", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                              Text("Enable for Free Fire MAX", color = LiquidLavender.copy(0.7f), fontSize = 11.sp)
+                              Text("Free Fire MAX & All Games", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                              Text("Force ANGLE Driver + Very Low Graphics", color = LiquidLavender.copy(0.75f), fontSize = 10.sp)
                           }
-                          Switch(checked = enableFFMax, onCheckedChange = { enableFFMax = it }, colors = SwitchDefaults.colors(checkedTrackColor = NeonPurple))
+                          Switch(checked = enableAllGames, onCheckedChange = { enableAllGames = it }, colors = SwitchDefaults.colors(checkedTrackColor = NeonPurple))
                       }
                   }
 
@@ -471,7 +750,7 @@ jobs:
                           }
                           Spacer(modifier = Modifier.height(12.dp))
                           Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                              Text("Texture Detail", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                              Text("Texture Detail (ANGLE Scale)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                               Text(detailLabels[sliderValue.toInt().coerceIn(0, 4)], color = LiquidLavender, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                           }
                           Slider(value = sliderValue, onValueChange = { sliderValue = it; selectedPreset = "Custom" }, valueRange = 0f..4f, steps = 3, colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = NeonPurple))
@@ -487,11 +766,11 @@ jobs:
                           }
                       }
                       Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                          Box(modifier = Modifier.weight(0.9f).height(46.dp).ios27LiquidGlass(RoundedCornerShape(16.dp), 0.16f).clickable { sliderValue = 0f; onApplyGraphics(0, false, false, false) }, contentAlignment = Alignment.Center) {
+                          Box(modifier = Modifier.weight(0.9f).height(46.dp).ios27LiquidGlass(RoundedCornerShape(16.dp), 0.16f).clickable { sliderValue = 0f; onApplyGraphics("ORIGINAL", 0, false, false, false) }, contentAlignment = Alignment.Center) {
                               Text("Reset to Original", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                           }
-                          Box(modifier = Modifier.weight(1.3f).height(46.dp).clip(RoundedCornerShape(16.dp)).background(Brush.horizontalGradient(listOf(NeonPurple, LiquidLavender))).clickable { onApplyGraphics(sliderValue.toInt(), sharpPixels, hardDistanceSteps, enableFFMax) }, contentAlignment = Alignment.Center) {
-                              Text("Save", color = DeepSpaceBlack, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                          Box(modifier = Modifier.weight(1.3f).height(46.dp).clip(RoundedCornerShape(16.dp)).background(Brush.horizontalGradient(listOf(NeonPurple, LiquidLavender))).clickable { onApplyGraphics(selectedPreset, sliderValue.toInt(), sharpPixels, hardDistanceSteps, enableAllGames) }, contentAlignment = Alignment.Center) {
+                              Text("Save (Apply ANGLE)", color = DeepSpaceBlack, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                           }
                       }
                   }
@@ -505,5 +784,5 @@ jobs:
       - name: Sediakan APK untuk Muat Turun
         uses: actions/upload-artifact@v4
         with:
-          name: Zayon-LiquidGlass-APK
+          name: Zayon-LiquidGlass-ANGLE-APK
           path: app/build/outputs/apk/debug/app-debug.apk
